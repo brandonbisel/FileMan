@@ -182,6 +182,10 @@ class FileListFragment : Fragment() {
                         performPaste()
                         true
                     }
+                    R.id.action_new_folder -> {
+                        showNewFolderDialog()
+                        true
+                    }
                     R.id.sort_name -> {
                         currentSortType = FileSorter.SortType.NAME
                         loadFiles(currentPath, addToHistory = false)
@@ -353,6 +357,43 @@ class FileListFragment : Fragment() {
                         loadFiles(currentPath, addToHistory = false)
                     } else {
                         Toast.makeText(context, getString(R.string.msg_rename_failed), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
+    }
+
+    /**
+     * Displays a dialog to create a new folder in the current directory.
+     */
+    private fun showNewFolderDialog() {
+        val container = FrameLayout(requireContext())
+        val editText = EditText(requireContext())
+        val params = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        val margin = (16 * resources.displayMetrics.density).toInt()
+        params.setMargins(margin, margin / 2, margin, margin / 2)
+        editText.layoutParams = params
+        editText.setHint(R.string.menu_new_folder)
+        container.addView(editText)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.menu_new_folder)
+            .setView(container)
+            .setPositiveButton(R.string.dialog_ok) { _, _ ->
+                val folderName = editText.text.toString()
+                if (folderName.isNotEmpty()) {
+                    val newFolder = File(currentPath, folderName)
+                    if (newFolder.exists()) {
+                        Toast.makeText(context, getString(R.string.msg_file_exists), Toast.LENGTH_SHORT).show()
+                    } else if (newFolder.mkdir()) {
+                        Toast.makeText(context, getString(R.string.msg_folder_created_success), Toast.LENGTH_SHORT).show()
+                        loadFiles(currentPath, addToHistory = false)
+                    } else {
+                        Toast.makeText(context, getString(R.string.msg_folder_create_failed), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
