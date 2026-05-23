@@ -282,6 +282,31 @@ class FileListFragment : Fragment() {
     }
 
     /**
+     * Shares a file using [FileProvider] and an [Intent.ACTION_SEND].
+     * @param file The file to be shared.
+     */
+    private fun shareFile(file: File) {
+        try {
+            val uri = FileProvider.getUriForFile(
+                requireContext(),
+                "${requireContext().packageName}.fileprovider",
+                file
+            )
+            val extension = file.extension.lowercase()
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "*/*"
+
+            val intent = Intent(Intent.ACTION_SEND)
+            intent.type = mimeType
+            intent.putExtra(Intent.EXTRA_STREAM, uri)
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            
+            startActivity(Intent.createChooser(intent, getString(R.string.menu_share)))
+        } catch (e: Exception) {
+            Toast.makeText(context, getString(R.string.msg_share_failed, e.message), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
      * Displays a context menu (Popup) for a specific file or folder.
      */
     private fun showContextMenu(file: File, view: View) {
@@ -292,6 +317,11 @@ class FileListFragment : Fragment() {
                 R.id.action_open -> {
                     if (file.isDirectory) loadFiles(file)
                     else openFile(file)
+                    true
+                }
+                R.id.action_share -> {
+                    if (!file.isDirectory) shareFile(file)
+                    else Toast.makeText(context, getString(R.string.msg_cannot_share_folders), Toast.LENGTH_SHORT).show()
                     true
                 }
                 R.id.action_copy -> {

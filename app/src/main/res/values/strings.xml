@@ -18,6 +18,7 @@
 
     <!-- Context Menu -->
     <string name="menu_open">Open</string>
+    <string name="menu_share">Share</string>
     <string name="menu_copy">Copy</string>
     <string name="menu_move">Move</string>
     <string name="menu_rename">Rename</string>
@@ -53,6 +54,8 @@
     <string name="msg_deleted_success">Deleted successfully</string>
     <string name="msg_delete_failed">Failed to delete</string>
     <string name="msg_open_failed">Could not open file: %s</string>
+    <string name="msg_share_failed">Could not share file: %s</string>
+    <string name="msg_cannot_share_folders">Cannot share folders</string>
     <string name="msg_copy_toast">Copied: %s</string>
     <string name="msg_move_toast">Moving: %s</string>
     <string name="msg_global_sort_set">Global default set to %s</string>
