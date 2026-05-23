@@ -16,11 +16,14 @@
 
 package com.beezlesoft.fileman
 
+import android.net.Uri
 import android.text.format.Formatter
+import android.util.Size
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.MimeTypeMap
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.AttrRes
@@ -29,6 +32,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 /**
  * Adapter for the RecyclerView to display file and directory entries.
@@ -47,6 +51,7 @@ class FileAdapter(
     private val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     private val selectedItems = mutableSetOf<File>()
     private var multiSelectMode = false
+    private val executor = Executors.newFixedThreadPool(4)
 
     /**
      * ViewHolder class for file list items.
@@ -94,8 +99,38 @@ class FileAdapter(
                 holder.icon.setImageResource(R.drawable.ic_folder)
                 holder.icon.setColorFilter(context.getColorFromAttr(com.google.android.material.R.attr.colorPrimary))
             } else {
-                holder.icon.setImageResource(R.drawable.ic_file)
-                holder.icon.setColorFilter(context.getColorFromAttr(com.google.android.material.R.attr.colorOutline))
+                val extension = file.extension.lowercase()
+                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: ""
+                
+                if (mimeType.startsWith("image/") || mimeType.startsWith("video/")) {
+                    holder.icon.setImageResource(R.drawable.ic_file) // Placeholder
+                    holder.icon.setColorFilter(context.getColorFromAttr(com.google.android.material.R.attr.colorOutline))
+                    
+                    val tag = file.absolutePath
+                    holder.icon.tag = tag
+                    
+                    executor.execute {
+                        try {
+                            val thumbnail = context.contentResolver.loadThumbnail(
+                                Uri.fromFile(file),
+                                Size(128, 128),
+                                null
+                            )
+                            holder.itemView.post {
+                                if (holder.icon.tag == tag) {
+                                    holder.icon.setImageBitmap(thumbnail)
+                                    holder.icon.clearColorFilter()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Failed to load thumbnail, keep generic icon
+                        }
+                    }
+                } else {
+                    holder.icon.setImageResource(R.drawable.ic_file)
+                    holder.icon.setColorFilter(context.getColorFromAttr(com.google.android.material.R.attr.colorOutline))
+                    holder.icon.tag = null
+                }
             }
         }
         
