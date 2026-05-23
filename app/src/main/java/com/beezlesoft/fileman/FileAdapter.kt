@@ -40,10 +40,13 @@ import java.util.Locale
 class FileAdapter(
     private var files: List<File>,
     private val onItemClick: (File) -> Unit,
-    private val onItemLongClick: (File, View) -> Unit
+    private val onItemLongClick: (File, View) -> Unit,
+    private val onSelectionChanged: (Int) -> Unit
 ) : RecyclerView.Adapter<FileAdapter.FileViewHolder>() {
 
     private val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+    private val selectedItems = mutableSetOf<File>()
+    private var multiSelectMode = false
 
     /**
      * ViewHolder class for file list items.
@@ -52,6 +55,7 @@ class FileAdapter(
         val icon: ImageView = view.findViewById(R.id.fileIcon)
         val name: TextView = view.findViewById(R.id.fileName)
         val info: TextView = view.findViewById(R.id.fileInfo)
+        val container: View = view
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FileViewHolder {
@@ -68,6 +72,9 @@ class FileAdapter(
         val size = if (file.isDirectory) "" else Formatter.formatShortFileSize(context, file.length())
         val date = dateFormat.format(Date(file.lastModified()))
         
+        // Show selection state
+        holder.container.isActivated = selectedItems.contains(file)
+
         if (file.name == "..") {
             holder.name.text = ".."
             holder.info.text = context.getString(R.string.file_info_parent_dir)
@@ -92,14 +99,47 @@ class FileAdapter(
             }
         }
         
-        holder.itemView.setOnClickListener { onItemClick(file) }
+        holder.itemView.setOnClickListener {
+            if (multiSelectMode && file.name != "..") {
+                toggleSelection(file)
+            } else {
+                onItemClick(file)
+            }
+        }
         holder.itemView.setOnLongClickListener { 
-            onItemLongClick(file, it)
+            if (file.name != "..") {
+                if (!multiSelectMode) {
+                    setMultiSelectMode(true)
+                    toggleSelection(file)
+                } else {
+                    onItemLongClick(file, it)
+                }
+            }
             true 
         }
     }
 
     override fun getItemCount(): Int = files.size
+
+    fun setMultiSelectMode(enabled: Boolean) {
+        multiSelectMode = enabled
+        if (!enabled) {
+            selectedItems.clear()
+            notifyDataSetChanged()
+        }
+    }
+
+    fun toggleSelection(file: File) {
+        if (selectedItems.contains(file)) {
+            selectedItems.remove(file)
+        } else {
+            selectedItems.add(file)
+        }
+        notifyItemChanged(files.indexOf(file))
+        onSelectionChanged(selectedItems.size)
+    }
+
+    fun getSelectedFiles(): List<File> = selectedItems.toList()
 
     /**
      * Updates the adapter's data set and refreshes the list.

@@ -36,6 +36,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.FileProvider
 import androidx.core.view.MenuHost
@@ -113,8 +114,9 @@ class FileListFragment : Fragment() {
             }
         }
 
-    private var clipboardFile: File? = null
+    private var clipboardFiles: List<File>? = null
     private var isMoveOperation: Boolean = false
+    private var actionMode: ActionMode? = null
 
     private val pathHistory = mutableListOf<File>()
 
@@ -172,7 +174,7 @@ class FileListFragment : Fragment() {
                 menu.findItem(R.id.action_system).isVisible = showAdvanced
                 menu.findItem(R.id.action_root).isVisible = showAdvanced
                 menu.findItem(R.id.action_app_private).isVisible = showAdvanced
-                menu.findItem(R.id.action_paste).isVisible = clipboardFile != null
+                menu.findItem(R.id.action_paste).isVisible = clipboardFiles != null
 
                 val searchItem = menu.findItem(R.id.action_search)
                 val searchView = searchItem.actionView as androidx.appcompat.widget.SearchView
@@ -264,11 +266,73 @@ class FileListFragment : Fragment() {
                 if (file.name != "..") {
                     showContextMenu(file, v)
                 }
+            },
+            onSelectionChanged = { count ->
+                if (count == 0) {
+                    actionMode?.finish()
+                } else {
+                    if (actionMode == null) {
+                        actionMode = (requireActivity() as AppCompatActivity).startSupportActionMode(actionModeCallback)
+                    }
+                    actionMode?.title = count.toString()
+                }
             }
         )
 
         binding.recyclerView.layoutManager = LinearLayoutManager(context)
         binding.recyclerView.adapter = adapter
+    }
+
+    private val actionModeCallback = object : ActionMode.Callback {
+        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+            mode.menuInflater.inflate(R.menu.menu_file_selection, menu)
+            adapter.setMultiSelectMode(true)
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
+
+        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+            val selectedFiles = adapter.getSelectedFiles()
+            return when (item.itemId) {
+                R.id.action_share -> {
+                    val filesToShare = selectedFiles.filter { !it.isDirectory }
+                    if (filesToShare.isNotEmpty()) {
+                        // Bulk sharing is complex, for now we share the first or show toast
+                        if (filesToShare.size == 1) shareFile(filesToShare[0])
+                        else Toast.makeText(context, "Bulk sharing not fully supported yet", Toast.LENGTH_SHORT).show()
+                    }
+                    mode.finish()
+                    true
+                }
+                R.id.action_copy -> {
+                    clipboardFiles = selectedFiles
+                    isMoveOperation = false
+                    requireActivity().invalidateOptionsMenu()
+                    Toast.makeText(context, "Copied ${selectedFiles.size} items", Toast.LENGTH_SHORT).show()
+                    mode.finish()
+                    true
+                }
+                R.id.action_move -> {
+                    clipboardFiles = selectedFiles
+                    isMoveOperation = true
+                    requireActivity().invalidateOptionsMenu()
+                    Toast.makeText(context, "Moving ${selectedFiles.size} items", Toast.LENGTH_SHORT).show()
+                    mode.finish()
+                    true
+                }
+                R.id.action_delete -> {
+                    showBulkDeleteConfirmation(selectedFiles)
+                    true
+                }
+                else -> false
+            }
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode) {
+            adapter.setMultiSelectMode(false)
+            actionMode = null
+        }
     }
 
     /**
@@ -339,14 +403,14 @@ class FileListFragment : Fragment() {
                     true
                 }
                 R.id.action_copy -> {
-                    clipboardFile = file
+                    clipboardFiles = listOf(file)
                     isMoveOperation = false
                     requireActivity().invalidateOptionsMenu()
                     Toast.makeText(context, getString(R.string.msg_copy_toast, file.name), Toast.LENGTH_SHORT).show()
                     true
                 }
                 R.id.action_move -> {
-                    clipboardFile = file
+                    clipboardFiles = listOf(file)
                     isMoveOperation = true
                     requireActivity().invalidateOptionsMenu()
                     Toast.makeText(context, getString(R.string.msg_move_toast, file.name), Toast.LENGTH_SHORT).show()
@@ -446,31 +510,36 @@ class FileListFragment : Fragment() {
     }
 
     /**
-     * Executes the copy or move operation using the current [clipboardFile].
+     * Executes the copy or move operation using the current [clipboardFiles].
      */
     private fun performPaste() {
-        val source = clipboardFile ?: return
-        val destination = File(currentPath, source.name)
-
-        if (destination.exists()) {
-            Toast.makeText(context, getString(R.string.msg_file_exists), Toast.LENGTH_SHORT).show()
-            return
-        }
+        val sources = clipboardFiles ?: return
+        var successCount = 0
 
         try {
-            if (isMoveOperation) {
-                if (source.renameTo(destination)) {
-                    Toast.makeText(context, getString(R.string.msg_moved_success), Toast.LENGTH_SHORT).show()
-                } else {
-                    FileOperations.copyRecursive(source, destination)
-                    FileOperations.deleteRecursive(source)
-                    Toast.makeText(context, getString(R.string.msg_moved_success_fallback), Toast.LENGTH_SHORT).show()
+            sources.forEach { source ->
+                val destination = File(currentPath, source.name)
+                if (!destination.exists()) {
+                    if (isMoveOperation) {
+                        if (source.renameTo(destination)) {
+                            successCount++
+                        } else {
+                            FileOperations.copyRecursive(source, destination)
+                            FileOperations.deleteRecursive(source)
+                            successCount++
+                        }
+                    } else {
+                        FileOperations.copyRecursive(source, destination)
+                        successCount++
+                    }
                 }
-            } else {
-                FileOperations.copyRecursive(source, destination)
-                Toast.makeText(context, getString(R.string.msg_copied_success), Toast.LENGTH_SHORT).show()
             }
-            clipboardFile = null
+            
+            if (successCount > 0) {
+                Toast.makeText(context, if (isMoveOperation) getString(R.string.msg_moved_success) else getString(R.string.msg_copied_success), Toast.LENGTH_SHORT).show()
+            }
+            
+            clipboardFiles = null
             requireActivity().invalidateOptionsMenu()
             loadFiles(currentPath, addToHistory = false)
         } catch (e: Exception) {
@@ -504,6 +573,26 @@ class FileListFragment : Fragment() {
         } else {
             Toast.makeText(context, getString(R.string.msg_delete_failed), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun showBulkDeleteConfirmation(files: List<File>) {
+        if (!confirmDelete) {
+            files.forEach { FileOperations.deleteRecursive(it) }
+            loadFiles(currentPath, addToHistory = false)
+            actionMode?.finish()
+            return
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.dialog_confirm_delete_title)
+            .setMessage("Are you sure you want to delete ${files.size} items?")
+            .setPositiveButton(R.string.menu_delete) { _, _ ->
+                files.forEach { FileOperations.deleteRecursive(it) }
+                loadFiles(currentPath, addToHistory = false)
+                actionMode?.finish()
+            }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
     }
 
     /**
