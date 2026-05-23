@@ -69,6 +69,7 @@ class FileListFragment : Fragment() {
 
     private val prefs by lazy { requireContext().getSharedPreferences("settings", Context.MODE_PRIVATE) }
     private val sortPrefs by lazy { requireContext().getSharedPreferences("directory_sort_settings", Context.MODE_PRIVATE) }
+    private val favoritePrefs by lazy { requireContext().getSharedPreferences("favorites", Context.MODE_PRIVATE) }
 
     /**
      * Whether to show advanced system folders in the navigation menu and root listing.
@@ -390,6 +391,17 @@ class FileListFragment : Fragment() {
     private fun showContextMenu(file: File, view: View) {
         val popup = PopupMenu(requireContext(), view)
         popup.menuInflater.inflate(R.menu.menu_file_context, popup.menu)
+        
+        val favoriteItem = popup.menu.findItem(R.id.action_favorite)
+        val isFavorite = favoritePrefs.contains(file.absolutePath)
+        
+        if (file.isDirectory) {
+            favoriteItem.isVisible = true
+            favoriteItem.setTitle(if (isFavorite) R.string.menu_unfavorite else R.string.menu_favorite)
+        } else {
+            favoriteItem.isVisible = false
+        }
+
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_open -> {
@@ -428,10 +440,25 @@ class FileListFragment : Fragment() {
                     showFileDetails(file)
                     true
                 }
+                R.id.action_favorite -> {
+                    toggleFavorite(file)
+                    true
+                }
                 else -> false
             }
         }
         popup.show()
+    }
+
+    private fun toggleFavorite(file: File) {
+        val path = file.absolutePath
+        if (favoritePrefs.contains(path)) {
+            favoritePrefs.edit().remove(path).apply()
+            Toast.makeText(context, "Removed from favorites", Toast.LENGTH_SHORT).show()
+        } else {
+            favoritePrefs.edit().putString(path, file.name).apply()
+            Toast.makeText(context, "Added to favorites", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /**
