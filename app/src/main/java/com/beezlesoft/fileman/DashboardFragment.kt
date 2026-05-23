@@ -37,9 +37,12 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.R as MaterialR
 import com.beezlesoft.fileman.databinding.FragmentDashboardBinding
 import java.io.File
 
+@Suppress("TooManyFunctions")
 class DashboardFragment : Fragment() {
 
     private var _binding: FragmentDashboardBinding? = null
@@ -115,73 +118,93 @@ class DashboardFragment : Fragment() {
         val currentContext = context ?: return
         val items = mutableListOf<DashboardItem>()
         
-        // Add Favorites
-        val favorites = favoritePrefs.all
-        if (favorites.isNotEmpty()) {
-            // Header or label for favorites
-            favorites.forEach { (path, name) ->
-                val file = File(path)
-                if (file.exists()) {
-                    items.add(DashboardItem(name.toString(), R.drawable.ic_folder, file, "Favorite • $path"))
-                } else {
-                    favoritePrefs.edit().remove(path).apply()
-                }
-            }
-        }
-
-        // Use StorageManager to find all available volumes
-        try {
-            val storageManager = currentContext.getSystemService(Context.STORAGE_SERVICE) as StorageManager
-            val primaryVolumePath = currentContext.getExternalFilesDir(null)?.absolutePath?.substringBefore("/Android") ?: ""
-
-            storageManager.storageVolumes.forEach { volume ->
-                val path = volume.directory
-                if (path != null) {
-                    val absolutePath = path.absolutePath
-                    val title = if (volume.isPrimary) {
-                        getString(R.string.menu_internal_storage)
-                    } else {
-                        // Skip if this is a redundant view of the primary storage
-                        if (absolutePath == primaryVolumePath || primaryVolumePath.startsWith(absolutePath)) {
-                            return@forEach
-                        }
-                        volume.getDescription(currentContext)
-                    }
-
-                    // Calculate capacity
-                    val totalSpace = path.totalSpace
-                    val freeSpace = path.usableSpace
-                    val usedSpace = totalSpace - freeSpace
-                    
-                    val capacityStr = if (totalSpace > 0) {
-                        val used = Formatter.formatShortFileSize(currentContext, usedSpace)
-                        val total = Formatter.formatShortFileSize(currentContext, totalSpace)
-                        "$used used of $total • $absolutePath"
-                    } else {
-                        absolutePath
-                    }
-
-                    items.add(DashboardItem(title, R.drawable.ic_folder, path, capacityStr))
-                }
-            }
-        } catch (e: Exception) {
-            // Fallback: Add at least the primary storage if volume discovery fails
-            val internalStorage = Environment.getExternalStorageDirectory()
-            items.add(DashboardItem(getString(R.string.menu_internal_storage), R.drawable.ic_folder, internalStorage))
-        }
-
-        if (showAdvanced) {
-            items.add(DashboardItem(getString(R.string.menu_app_private), R.drawable.ic_folder, requireContext().filesDir.parentFile ?: requireContext().filesDir))
-            items.add(DashboardItem(getString(R.string.menu_system_files), R.drawable.ic_folder, File("/system")))
-            items.add(DashboardItem(getString(R.string.menu_system_root), R.drawable.ic_folder, File("/")))
-        }
+        addFavorites(items)
+        addVolumes(currentContext, items)
+        addAdvancedFolders(items)
 
         binding.dashboardRecyclerView.layoutManager = LinearLayoutManager(context)
         binding.dashboardRecyclerView.adapter = DashboardAdapter(items) { item ->
             val bundle = Bundle().apply {
                 putString("initialPath", item.path.absolutePath)
             }
-            findNavController().navigate(R.id.action_DashboardFragment_to_FileListFragment, bundle)
+            val actionId = R.id.action_DashboardFragment_to_FileListFragment
+            findNavController().navigate(actionId, bundle)
+        }
+    }
+
+    private fun addFavorites(items: MutableList<DashboardItem>) {
+        val favorites = favoritePrefs.all
+        if (favorites.isNotEmpty()) {
+            favorites.forEach { (path, name) ->
+                val file = File(path)
+                if (file.exists()) {
+                    val subtitle = "Favorite • $path"
+                    val icon = R.drawable.ic_folder
+                    items.add(DashboardItem(name.toString(), icon, file, subtitle))
+                } else {
+                    favoritePrefs.edit().remove(path).apply()
+                }
+            }
+        }
+    }
+
+    private fun addVolumes(currentContext: Context, items: MutableList<DashboardItem>) {
+        try {
+            val storageManager = currentContext.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+            val primaryVolumePath = currentContext.getExternalFilesDir(null)
+                ?.absolutePath?.substringBefore("/Android") ?: ""
+
+            storageManager.storageVolumes.forEach { volume ->
+                addVolumeItem(currentContext, volume, primaryVolumePath, items)
+            }
+        } catch (e: SecurityException) {
+            android.util.Log.e("Dashboard", "Storage discovery failed", e)
+            val internalStorage = Environment.getExternalStorageDirectory()
+            items.add(DashboardItem(getString(R.string.menu_internal_storage), R.drawable.ic_folder, internalStorage))
+        }
+    }
+
+    private fun addVolumeItem(
+        context: Context, 
+        volume: android.os.storage.StorageVolume, 
+        primaryPath: String, 
+        items: MutableList<DashboardItem>
+    ) {
+        val path = volume.directory ?: return
+        val absolutePath = path.absolutePath
+        
+        if (volume.isPrimary) {
+            val title = getString(R.string.menu_internal_storage)
+            items.add(DashboardItem(title, R.drawable.ic_folder, path, getCapacityStr(context, path)))
+        } else {
+            if (absolutePath == primaryPath || primaryPath.startsWith(absolutePath)) {
+                return
+            }
+            val title = volume.getDescription(context)
+            items.add(DashboardItem(title, R.drawable.ic_folder, path, getCapacityStr(context, path)))
+        }
+    }
+
+    private fun getCapacityStr(context: Context, path: File): String {
+        val totalSpace = path.totalSpace
+        val freeSpace = path.usableSpace
+        val usedSpace = totalSpace - freeSpace
+        
+        return if (totalSpace > 0) {
+            val used = Formatter.formatShortFileSize(context, usedSpace)
+            val total = Formatter.formatShortFileSize(context, totalSpace)
+            "$used used of $total • ${path.absolutePath}"
+        } else {
+            path.absolutePath
+        }
+    }
+
+    private fun addAdvancedFolders(items: MutableList<DashboardItem>) {
+        if (showAdvanced) {
+            val appPrivateDir = requireContext().filesDir.parentFile ?: requireContext().filesDir
+            items.add(DashboardItem(getString(R.string.menu_app_private), R.drawable.ic_folder, appPrivateDir))
+            items.add(DashboardItem(getString(R.string.menu_system_files), R.drawable.ic_folder, File("/system")))
+            items.add(DashboardItem(getString(R.string.menu_system_root), R.drawable.ic_folder, File("/")))
         }
     }
 
@@ -236,10 +259,16 @@ class DashboardFragment : Fragment() {
             val item = items[position]
             val context = holder.itemView.context
             
-            // Apply theme attributes programmatically to avoid inflation-time crashes
-            val colorPrimary = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorPrimary, 0xFF0061A4.toInt())
-            val colorOnSurface = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0xFF1A1C1E.toInt())
-            val colorOnSurfaceVariant = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFF43474E.toInt())
+            // Resolve colors using helper
+            val colorPrimary = MaterialColors.getColor(
+                context, MaterialR.attr.colorPrimary, 0xFF0061A4.toInt()
+            )
+            val colorOnSurface = MaterialColors.getColor(
+                context, MaterialR.attr.colorOnSurface, 0xFF1A1C1E.toInt()
+            )
+            val colorVariant = MaterialColors.getColor(
+                context, MaterialR.attr.colorOnSurfaceVariant, 0xFF43474E.toInt()
+            )
             
             val outValue = TypedValue()
             if (context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)) {
@@ -253,7 +282,7 @@ class DashboardFragment : Fragment() {
             holder.binding.fileIcon.setColorFilter(colorPrimary)
             
             holder.binding.fileInfo.text = item.subtitle ?: item.path.absolutePath
-            holder.binding.fileInfo.setTextColor(colorOnSurfaceVariant)
+            holder.binding.fileInfo.setTextColor(colorVariant)
 
             holder.itemView.setOnClickListener { onClick(item) }
         }
@@ -261,3 +290,4 @@ class DashboardFragment : Fragment() {
         override fun getItemCount() = items.size
     }
 }
+

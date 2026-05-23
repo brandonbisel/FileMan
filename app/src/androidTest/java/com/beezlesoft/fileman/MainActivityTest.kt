@@ -37,3 +37,4 @@ class MainActivityTest {
         onView(withId(R.id.dashboardRecyclerView)).check(matches(isDisplayed()))
     }
 }
+

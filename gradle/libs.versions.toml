@@ -12,6 +12,9 @@ navigationFragmentKtx = "2.6.0"
 navigationUiKtx = "2.6.0"
 kotlinxCoroutines = "1.7.1"
 coil = "2.7.0"
+detekt = "1.23.8"
+kover = "0.9.8"
+dependencyCheck = "12.2.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,3 +33,6 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+dependencyCheck = { id = "org.owasp.dependencycheck", version.ref = "dependencyCheck" }

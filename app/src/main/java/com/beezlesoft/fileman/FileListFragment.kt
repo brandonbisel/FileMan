@@ -55,7 +55,20 @@ import kotlinx.coroutines.launch
  * It manages directory navigation, file operations (copy, move, rename, delete), search, 
  * multi-selection, and favorites.
  */
+@Suppress("TooManyFunctions")
 class FileListFragment : Fragment() {
+
+    companion object {
+        private const val RENAME_MARGIN_DP = 16
+        private const val NEW_FOLDER_MARGIN_DP = 16
+        
+        private const val IDX_ADVANCED = 0
+        private const val IDX_HIDDEN = 1
+        private const val IDX_CONFIRM = 2
+        private const val IDX_GLOBAL_SORT = 3
+        private const val IDX_THUMBNAILS = 4
+        private const val IDX_GLOBAL_THUMB = 5
+    }
 
     private var _binding: FragmentFirstBinding? = null
     /**
@@ -65,15 +78,22 @@ class FileListFragment : Fragment() {
 
     private lateinit var adapter: FileAdapter
     private var currentPath: File = Environment.getExternalStorageDirectory()
-    private val rootPath: File = File("/")
 
     private var allFiles: List<File> = emptyList()
     private var currentQuery: String = ""
 
-    private val prefs by lazy { requireContext().getSharedPreferences("settings", Context.MODE_PRIVATE) }
-    private val sortPrefs by lazy { requireContext().getSharedPreferences("directory_sort_settings", Context.MODE_PRIVATE) }
-    private val thumbnailPrefs by lazy { requireContext().getSharedPreferences("directory_thumbnail_settings", Context.MODE_PRIVATE) }
-    private val favoritePrefs by lazy { requireContext().getSharedPreferences("favorites", Context.MODE_PRIVATE) }
+    private val prefs by lazy { 
+        requireContext().getSharedPreferences("settings", Context.MODE_PRIVATE) 
+    }
+    private val sortPrefs by lazy { 
+        requireContext().getSharedPreferences("directory_sort_settings", Context.MODE_PRIVATE) 
+    }
+    private val thumbnailPrefs by lazy { 
+        requireContext().getSharedPreferences("directory_thumbnail_settings", Context.MODE_PRIVATE) 
+    }
+    private val favoritePrefs by lazy { 
+        requireContext().getSharedPreferences("favorites", Context.MODE_PRIVATE) 
+    }
 
     /**
      * Whether to show advanced system folders in the navigation menu and root listing.
@@ -327,8 +347,12 @@ class FileListFragment : Fragment() {
                     val filesToShare = selectedFiles.filter { !it.isDirectory }
                     if (filesToShare.isNotEmpty()) {
                         // Bulk sharing is complex, for now we share the first or show toast
-                        if (filesToShare.size == 1) shareFile(filesToShare[0])
-                        else Toast.makeText(context, "Bulk sharing not fully supported yet", Toast.LENGTH_SHORT).show()
+                        if (filesToShare.size == 1) {
+                    shareFile(filesToShare[0])
+                } else {
+                    val msg = "Bulk sharing not fully supported yet"
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
                     }
                     mode.finish()
                     true
@@ -382,7 +406,7 @@ class FileListFragment : Fragment() {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             
             startActivity(Intent.createChooser(intent, getString(R.string.menu_open)))
-        } catch (e: Exception) {
+        } catch (e: android.content.ActivityNotFoundException) {
             Toast.makeText(context, getString(R.string.msg_open_failed, e.message), Toast.LENGTH_SHORT).show()
         }
     }
@@ -407,7 +431,7 @@ class FileListFragment : Fragment() {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             
             startActivity(Intent.createChooser(intent, getString(R.string.menu_share)))
-        } catch (e: Exception) {
+        } catch (e: android.content.ActivityNotFoundException) {
             Toast.makeText(context, getString(R.string.msg_share_failed, e.message), Toast.LENGTH_SHORT).show()
         }
     }
@@ -424,57 +448,68 @@ class FileListFragment : Fragment() {
         
         if (file.isDirectory) {
             favoriteItem.isVisible = true
-            favoriteItem.setTitle(if (isFavorite) R.string.menu_unfavorite else R.string.menu_favorite)
+            val titleRes = if (isFavorite) R.string.menu_unfavorite else R.string.menu_favorite
+            favoriteItem.setTitle(titleRes)
         } else {
             favoriteItem.isVisible = false
         }
 
         popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                R.id.action_open -> {
-                    if (file.isDirectory) loadFiles(file)
-                    else openFile(file)
-                    true
-                }
-                R.id.action_share -> {
-                    if (!file.isDirectory) shareFile(file)
-                    else Toast.makeText(context, getString(R.string.msg_cannot_share_folders), Toast.LENGTH_SHORT).show()
-                    true
-                }
-                R.id.action_copy -> {
-                    clipboardFiles = listOf(file)
-                    isMoveOperation = false
-                    requireActivity().invalidateOptionsMenu()
-                    Toast.makeText(context, getString(R.string.msg_copy_toast, file.name), Toast.LENGTH_SHORT).show()
-                    true
-                }
-                R.id.action_move -> {
-                    clipboardFiles = listOf(file)
-                    isMoveOperation = true
-                    requireActivity().invalidateOptionsMenu()
-                    Toast.makeText(context, getString(R.string.msg_move_toast, file.name), Toast.LENGTH_SHORT).show()
-                    true
-                }
-                R.id.action_rename -> {
-                    showRenameDialog(file)
-                    true
-                }
-                R.id.action_delete -> {
-                    showDeleteConfirmation(file)
-                    true
-                }
-                R.id.action_details -> {
-                    showFileDetails(file)
-                    true
-                }
-                R.id.action_favorite -> {
-                    toggleFavorite(file)
-                    true
-                }
-                else -> false
-            }
+            handleContextMenuItemClick(item, file)
         }
         popup.show()
+    }
+
+    private fun handleContextMenuItemClick(item: MenuItem, file: File): Boolean {
+        return when (item.itemId) {
+            R.id.action_open -> {
+                if (file.isDirectory) loadFiles(file)
+                else openFile(file)
+                true
+            }
+            R.id.action_share -> {
+                if (!file.isDirectory) {
+                    shareFile(file)
+                } else {
+                    val msg = getString(R.string.msg_cannot_share_folders)
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+                true
+            }
+            R.id.action_copy -> {
+                clipboardFiles = listOf(file)
+                isMoveOperation = false
+                requireActivity().invalidateOptionsMenu()
+                val msg = getString(R.string.msg_copy_toast, file.name)
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                true
+            }
+            R.id.action_move -> {
+                clipboardFiles = listOf(file)
+                isMoveOperation = true
+                requireActivity().invalidateOptionsMenu()
+                val msg = getString(R.string.msg_move_toast, file.name)
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                true
+            }
+            R.id.action_rename -> {
+                showRenameDialog(file)
+                true
+            }
+            R.id.action_delete -> {
+                showDeleteConfirmation(file)
+                true
+            }
+            R.id.action_details -> {
+                showFileDetails(file)
+                true
+            }
+            R.id.action_favorite -> {
+                toggleFavorite(file)
+                true
+            }
+            else -> false
+        }
     }
 
     /**
@@ -501,8 +536,10 @@ class FileListFragment : Fragment() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
-        val margin = (16 * resources.displayMetrics.density).toInt()
-        params.setMargins(margin, margin / 2, margin, margin / 2)
+        val density = resources.displayMetrics.density
+        val margin = (RENAME_MARGIN_DP * density).toInt()
+        val halfMargin = margin / 2
+        params.setMargins(margin, halfMargin, margin, halfMargin)
         editText.layoutParams = params
         editText.setText(file.name)
         editText.selectAll()
@@ -539,8 +576,10 @@ class FileListFragment : Fragment() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
-        val margin = (16 * resources.displayMetrics.density).toInt()
-        params.setMargins(margin, margin / 2, margin, margin / 2)
+        val density = resources.displayMetrics.density
+        val margin = (NEW_FOLDER_MARGIN_DP * density).toInt()
+        val halfMargin = margin / 2
+        params.setMargins(margin, halfMargin, margin, halfMargin)
         editText.layoutParams = params
         editText.setHint(R.string.menu_new_folder)
         container.addView(editText)
@@ -555,7 +594,8 @@ class FileListFragment : Fragment() {
                     if (newFolder.exists()) {
                         Toast.makeText(context, getString(R.string.msg_file_exists), Toast.LENGTH_SHORT).show()
                     } else if (newFolder.mkdir()) {
-                        Toast.makeText(context, getString(R.string.msg_folder_created_success), Toast.LENGTH_SHORT).show()
+                        val msg = getString(R.string.msg_folder_created_success)
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         loadFiles(currentPath, addToHistory = false)
                     } else {
                         Toast.makeText(context, getString(R.string.msg_folder_create_failed), Toast.LENGTH_SHORT).show()
@@ -595,13 +635,15 @@ class FileListFragment : Fragment() {
                 }
                 
                 if (successCount > 0) {
-                    Toast.makeText(context, if (isMoveOperation) getString(R.string.msg_moved_success) else getString(R.string.msg_copied_success), Toast.LENGTH_SHORT).show()
+                    val msg = if (isMoveOperation) getString(R.string.msg_moved_success) 
+                              else getString(R.string.msg_copied_success)
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 }
                 
                 clipboardFiles = null
                 requireActivity().invalidateOptionsMenu()
                 loadFiles(currentPath, addToHistory = false)
-            } catch (e: Exception) {
+            } catch (e: java.io.IOException) {
                 Toast.makeText(context, getString(R.string.msg_operation_failed, e.message), Toast.LENGTH_LONG).show()
             } finally {
                 dialog.dismiss()
@@ -744,42 +786,52 @@ class FileListFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.dialog_settings_title)
             .setMultiChoiceItems(options, checked) { _, which, isChecked ->
-                when (which) {
-                    0 -> {
-                        showAdvanced = isChecked
-                        requireActivity().invalidateOptionsMenu()
-                        if (!showAdvanced && (currentPath.absolutePath == "/" || currentPath.absolutePath.startsWith("/system"))) {
-                            loadFiles(Environment.getExternalStorageDirectory())
-                        }
-                    }
-                    1 -> {
-                        showHidden = isChecked
-                        loadFiles(currentPath, addToHistory = false)
-                    }
-                    2 -> {
-                        confirmDelete = isChecked
-                    }
-                    3 -> {
-                        if (isChecked) {
-                            globalSortType = currentSortType
-                            Toast.makeText(context, getString(R.string.msg_global_sort_set, currentSortType.name), Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    4 -> {
-                        currentShowThumbnails = isChecked
-                        adapter.setShowThumbnails(isChecked)
-                        loadFiles(currentPath, addToHistory = false)
-                    }
-                    5 -> {
-                        if (isChecked) {
-                            globalShowThumbnails = currentShowThumbnails
-                            Toast.makeText(context, getString(R.string.msg_global_thumbnails_set, globalShowThumbnails), Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
+                handleSettingSelection(which, isChecked)
             }
             .setPositiveButton(R.string.dialog_close, null)
             .show()
+    }
+
+    private fun handleSettingSelection(which: Int, isChecked: Boolean) {
+        when (which) {
+            IDX_ADVANCED -> {
+                showAdvanced = isChecked
+                requireActivity().invalidateOptionsMenu()
+                val isRoot = currentPath.absolutePath == "/"
+                val isSystem = currentPath.absolutePath.startsWith("/system")
+                if (!showAdvanced && (isRoot || isSystem)) {
+                    loadFiles(Environment.getExternalStorageDirectory())
+                }
+            }
+            IDX_HIDDEN -> {
+                showHidden = isChecked
+                loadFiles(currentPath, addToHistory = false)
+            }
+            IDX_CONFIRM -> {
+                confirmDelete = isChecked
+            }
+            IDX_GLOBAL_SORT -> {
+                if (isChecked) {
+                    globalSortType = currentSortType
+                    val name = currentSortType.name
+                    val msg = getString(R.string.msg_global_sort_set, name)
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+            }
+            IDX_THUMBNAILS -> {
+                currentShowThumbnails = isChecked
+                adapter.setShowThumbnails(isChecked)
+                loadFiles(currentPath, addToHistory = false)
+            }
+            IDX_GLOBAL_THUMB -> {
+                if (isChecked) {
+                    globalShowThumbnails = currentShowThumbnails
+                    val valThumb = globalShowThumbnails
+                    val msg = getString(R.string.msg_global_thumbnails_set, valThumb)
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     /**
@@ -812,7 +864,8 @@ class FileListFragment : Fragment() {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                 intent.data = Uri.parse("package:${requireContext().packageName}")
                 startActivity(intent)
-            } catch (e: Exception) {
+            } catch (e: android.content.ActivityNotFoundException) {
+                android.util.Log.w("FileList", "Primary permission activity not found, using fallback", e)
                 val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
                 startActivity(intent)
             }
@@ -828,7 +881,8 @@ class FileListFragment : Fragment() {
 
         if (filtered.isEmpty()) {
             if (!currentPath.canRead()) {
-                Toast.makeText(context, getString(R.string.msg_permission_denied_folder, currentPath.absolutePath), Toast.LENGTH_SHORT).show()
+                val msg = getString(R.string.msg_permission_denied_folder, currentPath.absolutePath)
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             } else if (currentPath.isDirectory && currentQuery.isEmpty()) {
                 Toast.makeText(context, getString(R.string.msg_directory_empty), Toast.LENGTH_SHORT).show()
             }
@@ -865,7 +919,10 @@ class FileListFragment : Fragment() {
         
         // Fallback for restricted root (/): show known readable system directories manually
         if (files == null && directory.absolutePath == "/") {
-            val knownRoots = arrayOf("/system", "/storage", "/proc", "/sys", "/etc", "/mnt", "/vendor", "/dev")
+            val knownRoots = arrayOf(
+                "/system", "/storage", "/proc", "/sys", 
+                "/etc", "/mnt", "/vendor", "/dev"
+            )
             files = knownRoots.map { File(it) }.filter { it.exists() }
         }
 
@@ -882,8 +939,10 @@ class FileListFragment : Fragment() {
         
         // Use friendly name for title if at storage root
         var displayTitle = directory.absolutePath
-        val storageManager = requireContext().getSystemService(Context.STORAGE_SERVICE) as StorageManager
-        val volume = storageManager.storageVolumes.find { it.directory?.absolutePath == directory.absolutePath }
+        val sManager = requireContext().getSystemService(Context.STORAGE_SERVICE) as StorageManager
+        val volume = sManager.storageVolumes.find { 
+            it.directory?.absolutePath == directory.absolutePath 
+        }
         if (volume != null) {
             displayTitle = if (volume.isPrimary) getString(R.string.menu_internal_storage)
             else volume.getDescription(requireContext())
@@ -904,3 +963,4 @@ class FileListFragment : Fragment() {
         _binding = null
     }
 }
+

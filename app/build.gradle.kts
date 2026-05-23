@@ -1,5 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kover)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.dependencyCheck)
 }
 
 android {
@@ -36,6 +39,23 @@ android {
     buildFeatures {
         viewBinding = true
     }
+}
+
+kover {
+    reports {
+        filters {
+            excludes {
+                classes("com.beezlesoft.fileman.databinding.*")
+            }
+        }
+    }
+}
+
+dependencyCheck {
+    nvd {
+        apiKey = project.findProperty("nvdApiKey")?.toString() ?: System.getenv("NVD_API_KEY")
+    }
+    formats = listOf("HTML", "JSON", "XML")
 }
 
 dependencies {

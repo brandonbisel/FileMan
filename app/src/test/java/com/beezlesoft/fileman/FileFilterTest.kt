@@ -69,3 +69,4 @@ class FileFilterTest {
         assertEquals("apple.txt", filtered[0].name)
     }
 }
+
