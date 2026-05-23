@@ -25,6 +25,9 @@
     <string name="menu_rename">Rename</string>
     <string name="menu_delete">Delete</string>
     <string name="menu_details">Details</string>
+    <string name="menu_favorite">Add to Favorites</string>
+    <string name="menu_unfavorite">Remove from Favorites</string>
+    <string name="dashboard_favorites">Favorites</string>
 
     <!-- Dialogs -->
     <string name="dialog_confirm_delete_title">Confirm Delete</string>
@@ -59,6 +62,8 @@
     <string name="msg_cannot_share_folders">Cannot share folders</string>
     <string name="msg_copy_toast">Copied: %s</string>
     <string name="msg_move_toast">Moving: %s</string>
+    <string name="msg_favorite_added">Added to favorites</string>
+    <string name="msg_favorite_removed">Removed from favorites</string>
     <string name="msg_global_sort_set">Global default set to %s</string>
 
     <!-- File Info Labels -->

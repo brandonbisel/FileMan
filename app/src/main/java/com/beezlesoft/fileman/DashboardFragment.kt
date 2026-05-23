@@ -57,6 +57,8 @@ class DashboardFragment : Fragment() {
         get() = prefs.getBoolean("confirm_delete", true)
         set(value) = prefs.edit().putBoolean("confirm_delete", value).apply()
 
+    private val favoritePrefs by lazy { requireContext().getSharedPreferences("favorites", Context.MODE_PRIVATE) }
+
     data class DashboardItem(
         val title: String, 
         val iconRes: Int, 
@@ -110,6 +112,20 @@ class DashboardFragment : Fragment() {
     private fun setupRecyclerView() {
         val items = mutableListOf<DashboardItem>()
         
+        // Add Favorites
+        val favorites = favoritePrefs.all
+        if (favorites.isNotEmpty()) {
+            // Header or label for favorites
+            favorites.forEach { (path, name) ->
+                val file = File(path)
+                if (file.exists()) {
+                    items.add(DashboardItem(name.toString(), R.drawable.ic_folder, file, "Favorite • $path"))
+                } else {
+                    favoritePrefs.edit().remove(path).apply()
+                }
+            }
+        }
+
         // Use StorageManager to find all available volumes
         val storageManager = requireContext().getSystemService(Context.STORAGE_SERVICE) as StorageManager
         val primaryVolumePath = requireContext().getExternalFilesDir(null)?.absolutePath?.substringBefore("/Android") ?: ""
