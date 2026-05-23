@@ -1,0 +1,580 @@
+/*
+ * Copyright 2026 Brandon Bisel
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.beezlesoft.fileman
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.os.Environment
+import android.os.storage.StorageManager
+import android.provider.Settings
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.MimeTypeMap
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.PopupMenu
+import androidx.core.content.FileProvider
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
+import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.beezlesoft.fileman.databinding.FragmentFirstBinding
+import java.io.File
+
+/**
+ * The primary fragment responsible for displaying the file list and handling user interactions.
+ * It manages directory navigation, file operations (copy, move, rename, delete), and settings.
+ */
+class FileListFragment : Fragment() {
+
+    private var _binding: FragmentFirstBinding? = null
+    /**
+     * View binding for the fragment layout.
+     */
+    private val binding get() = _binding!!
+
+    private lateinit var adapter: FileAdapter
+    private var currentPath: File = Environment.getExternalStorageDirectory()
+    private val rootPath: File = File("/")
+
+    private val prefs by lazy { requireContext().getSharedPreferences("settings", Context.MODE_PRIVATE) }
+    private val sortPrefs by lazy { requireContext().getSharedPreferences("directory_sort_settings", Context.MODE_PRIVATE) }
+
+    /**
+     * Whether to show advanced system folders in the navigation menu and root listing.
+     */
+    private var showAdvanced: Boolean
+        get() = prefs.getBoolean("show_advanced", false)
+        set(value) = prefs.edit().putBoolean("show_advanced", value).apply()
+
+    /**
+     * Whether to show hidden files (starting with a dot) in the file list.
+     */
+    private var showHidden: Boolean
+        get() = prefs.getBoolean("show_hidden", false)
+        set(value) = prefs.edit().putBoolean("show_hidden", value).apply()
+
+    /**
+     * Whether to prompt for confirmation before deleting a file.
+     */
+    private var confirmDelete: Boolean
+        get() = prefs.getBoolean("confirm_delete", true)
+        set(value) = prefs.edit().putBoolean("confirm_delete", value).apply()
+
+    /**
+     * The global default sorting strategy.
+     */
+    private var globalSortType: FileSorter.SortType
+        get() = FileSorter.SortType.valueOf(prefs.getString("sort_type", FileSorter.SortType.NAME.name)!!)
+        set(value) = prefs.edit().putString("sort_type", value.name).apply()
+
+    /**
+     * Gets the sorting strategy for the current directory, falling back to the global default.
+     */
+    private var currentSortType: FileSorter.SortType
+        get() {
+            val savedSort = sortPrefs.getString(currentPath.absolutePath, null)
+            return if (savedSort != null) FileSorter.SortType.valueOf(savedSort) else globalSortType
+        }
+        set(value) {
+            if (value == globalSortType) {
+                sortPrefs.edit().remove(currentPath.absolutePath).apply()
+            } else {
+                sortPrefs.edit().putString(currentPath.absolutePath, value.name).apply()
+            }
+        }
+
+    private var clipboardFile: File? = null
+    private var isMoveOperation: Boolean = false
+
+    private val pathHistory = mutableListOf<File>()
+
+    /**
+     * Callback for handling the system back button. Navigates back through the history of visited folders.
+     */
+    private val onBackPressedCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            if (pathHistory.isNotEmpty()) {
+                val prevPath = pathHistory.removeAt(pathHistory.size - 1)
+                loadFiles(prevPath, addToHistory = false)
+            } else {
+                isEnabled = false
+                requireActivity().onBackPressedDispatcher.onBackPressed()
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        requireActivity().onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+        
+        // Handle initial path argument
+        val initialPathStr = arguments?.getString("initialPath")
+        if (!initialPathStr.isNullOrEmpty()) {
+            currentPath = File(initialPathStr)
+        }
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentFirstBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        setupMenu()
+        setupRecyclerView()
+        checkPermissionsAndLoadFiles()
+    }
+
+    /**
+     * Sets up the toolbar menu using the modern [MenuProvider] API.
+     */
+    private fun setupMenu() {
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.menu_main, menu)
+                menu.findItem(R.id.action_home_nav).isVisible = true
+                menu.findItem(R.id.action_system).isVisible = showAdvanced
+                menu.findItem(R.id.action_root).isVisible = showAdvanced
+                menu.findItem(R.id.action_app_private).isVisible = showAdvanced
+                menu.findItem(R.id.action_paste).isVisible = clipboardFile != null
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                return when (menuItem.itemId) {
+                    R.id.action_home_nav -> {
+                        findNavController().popBackStack(R.id.DashboardFragment, false)
+                        true
+                    }
+                    R.id.action_paste -> {
+                        performPaste()
+                        true
+                    }
+                    R.id.sort_name -> {
+                        currentSortType = FileSorter.SortType.NAME
+                        loadFiles(currentPath, addToHistory = false)
+                        true
+                    }
+                    R.id.sort_size -> {
+                        currentSortType = FileSorter.SortType.SIZE
+                        loadFiles(currentPath, addToHistory = false)
+                        true
+                    }
+                    R.id.sort_date -> {
+                        currentSortType = FileSorter.SortType.DATE
+                        loadFiles(currentPath, addToHistory = false)
+                        true
+                    }
+                    R.id.action_home -> {
+                        loadFiles(Environment.getExternalStorageDirectory())
+                        true
+                    }
+                    R.id.action_app_private -> {
+                        loadFiles(requireContext().filesDir.parentFile ?: requireContext().filesDir)
+                        true
+                    }
+                    R.id.action_root -> {
+                        loadFiles(File("/"))
+                        true
+                    }
+                    R.id.action_storage -> {
+                        loadFiles(File("/storage"))
+                        true
+                    }
+                    R.id.action_system -> {
+                        loadFiles(File("/system"))
+                        true
+                    }
+                    R.id.action_settings -> {
+                        showSettingsDialog()
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
+    }
+
+    /**
+     * Initializes the RecyclerView with the [FileAdapter] and handles clicks.
+     */
+    private fun setupRecyclerView() {
+        adapter = FileAdapter(
+            files = emptyList(),
+            onItemClick = { file ->
+                if (file.name == "..") {
+                    currentPath.parentFile?.let { loadFiles(it) }
+                } else if (file.isDirectory) {
+                    loadFiles(file)
+                } else {
+                    openFile(file)
+                }
+            },
+            onItemLongClick = { file, v ->
+                if (file.name != "..") {
+                    showContextMenu(file, v)
+                }
+            }
+        )
+
+        binding.recyclerView.layoutManager = LinearLayoutManager(context)
+        binding.recyclerView.adapter = adapter
+    }
+
+    /**
+     * Securely opens a file using [FileProvider] and an [Intent.ACTION_VIEW].
+     * @param file The file to be opened.
+     */
+    private fun openFile(file: File) {
+        try {
+            val uri = FileProvider.getUriForFile(
+                requireContext(),
+                "${requireContext().packageName}.fileprovider",
+                file
+            )
+            val extension = file.extension.lowercase()
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "*/*"
+
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.setDataAndType(uri, mimeType)
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            
+            startActivity(Intent.createChooser(intent, getString(R.string.menu_open)))
+        } catch (e: Exception) {
+            Toast.makeText(context, getString(R.string.msg_open_failed, e.message), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Displays a context menu (Popup) for a specific file or folder.
+     */
+    private fun showContextMenu(file: File, view: View) {
+        val popup = PopupMenu(requireContext(), view)
+        popup.menuInflater.inflate(R.menu.menu_file_context, popup.menu)
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_open -> {
+                    if (file.isDirectory) loadFiles(file)
+                    else openFile(file)
+                    true
+                }
+                R.id.action_copy -> {
+                    clipboardFile = file
+                    isMoveOperation = false
+                    requireActivity().invalidateOptionsMenu()
+                    Toast.makeText(context, getString(R.string.msg_copy_toast, file.name), Toast.LENGTH_SHORT).show()
+                    true
+                }
+                R.id.action_move -> {
+                    clipboardFile = file
+                    isMoveOperation = true
+                    requireActivity().invalidateOptionsMenu()
+                    Toast.makeText(context, getString(R.string.msg_move_toast, file.name), Toast.LENGTH_SHORT).show()
+                    true
+                }
+                R.id.action_rename -> {
+                    showRenameDialog(file)
+                    true
+                }
+                R.id.action_delete -> {
+                    showDeleteConfirmation(file)
+                    true
+                }
+                R.id.action_details -> {
+                    showFileDetails(file)
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
+    /**
+     * Displays a dialog to rename the selected file or folder.
+     */
+    private fun showRenameDialog(file: File) {
+        val container = FrameLayout(requireContext())
+        val editText = EditText(requireContext())
+        val params = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        val margin = (16 * resources.displayMetrics.density).toInt()
+        params.setMargins(margin, margin / 2, margin, margin / 2)
+        editText.layoutParams = params
+        editText.setText(file.name)
+        editText.selectAll()
+        container.addView(editText)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.menu_rename)
+            .setView(container)
+            .setPositiveButton(R.string.menu_rename) { _, _ ->
+                val newName = editText.text.toString()
+                if (newName.isNotEmpty() && newName != file.name) {
+                    val destination = File(file.parentFile, newName)
+                    if (destination.exists()) {
+                        Toast.makeText(context, getString(R.string.msg_file_exists), Toast.LENGTH_SHORT).show()
+                    } else if (file.renameTo(destination)) {
+                        Toast.makeText(context, getString(R.string.msg_renamed_success), Toast.LENGTH_SHORT).show()
+                        loadFiles(currentPath, addToHistory = false)
+                    } else {
+                        Toast.makeText(context, getString(R.string.msg_rename_failed), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
+    }
+
+    /**
+     * Executes the copy or move operation using the current [clipboardFile].
+     */
+    private fun performPaste() {
+        val source = clipboardFile ?: return
+        val destination = File(currentPath, source.name)
+
+        if (destination.exists()) {
+            Toast.makeText(context, getString(R.string.msg_file_exists), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            if (isMoveOperation) {
+                if (source.renameTo(destination)) {
+                    Toast.makeText(context, getString(R.string.msg_moved_success), Toast.LENGTH_SHORT).show()
+                } else {
+                    FileOperations.copyRecursive(source, destination)
+                    FileOperations.deleteRecursive(source)
+                    Toast.makeText(context, getString(R.string.msg_moved_success_fallback), Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                FileOperations.copyRecursive(source, destination)
+                Toast.makeText(context, getString(R.string.msg_copied_success), Toast.LENGTH_SHORT).show()
+            }
+            clipboardFile = null
+            requireActivity().invalidateOptionsMenu()
+            loadFiles(currentPath, addToHistory = false)
+        } catch (e: Exception) {
+            Toast.makeText(context, getString(R.string.msg_operation_failed, e.message), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /**
+     * Deletes a file or directory, optionally prompting for confirmation based on settings.
+     */
+    private fun showDeleteConfirmation(file: File) {
+        if (!confirmDelete) {
+            performDelete(file)
+            return
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.dialog_confirm_delete_title)
+            .setMessage(getString(R.string.dialog_confirm_delete_message, file.name))
+            .setPositiveButton(R.string.menu_delete) { _, _ ->
+                performDelete(file)
+            }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
+    }
+
+    private fun performDelete(file: File) {
+        if (FileOperations.deleteRecursive(file)) {
+            Toast.makeText(context, getString(R.string.msg_deleted_success), Toast.LENGTH_SHORT).show()
+            loadFiles(currentPath, addToHistory = false)
+        } else {
+            Toast.makeText(context, getString(R.string.msg_delete_failed), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Shows a detailed alert dialog with metadata for the selected file.
+     */
+    private fun showFileDetails(file: File) {
+        val details = """
+            Name: ${file.name}
+            Path: ${file.absolutePath}
+            Size: ${if (file.isDirectory) "N/A" else "${file.length()} bytes"}
+            Readable: ${file.canRead()}
+            Writable: ${file.canWrite()}
+            Last Modified: ${java.util.Date(file.lastModified())}
+        """.trimIndent()
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.dialog_file_details_title)
+            .setMessage(details)
+            .setPositiveButton(R.string.dialog_ok, null)
+            .show()
+    }
+
+    /**
+     * Displays the settings dialog to toggle advanced browsing options and global defaults.
+     */
+    private fun showSettingsDialog() {
+        val options = arrayOf(
+            getString(R.string.dialog_settings_advanced), 
+            getString(R.string.dialog_settings_hidden_files),
+            getString(R.string.dialog_settings_confirm_delete),
+            getString(R.string.dialog_settings_global_sort)
+        )
+        val checked = booleanArrayOf(showAdvanced, showHidden, confirmDelete, false)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.dialog_settings_title)
+            .setMultiChoiceItems(options, checked) { _, which, isChecked ->
+                when (which) {
+                    0 -> {
+                        showAdvanced = isChecked
+                        requireActivity().invalidateOptionsMenu()
+                        if (!showAdvanced && (currentPath.absolutePath == "/" || currentPath.absolutePath.startsWith("/system"))) {
+                            loadFiles(Environment.getExternalStorageDirectory())
+                        }
+                    }
+                    1 -> {
+                        showHidden = isChecked
+                        loadFiles(currentPath, addToHistory = false)
+                    }
+                    2 -> {
+                        confirmDelete = isChecked
+                    }
+                    3 -> {
+                        if (isChecked) {
+                            globalSortType = currentSortType
+                            Toast.makeText(context, getString(R.string.msg_global_sort_set, currentSortType.name), Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+            .setPositiveButton(R.string.dialog_close, null)
+            .show()
+    }
+
+    /**
+     * Removes saved sort preferences for subdirectories of [parentDir] that no longer exist on disk.
+     * This prevents the settings database from being cluttered with paths to deleted folders.
+     */
+    private fun cleanupSortPrefs(parentDir: File) {
+        val orphaned = FileOperations.getOrphanedPrefKeys(parentDir, sortPrefs.all.keys)
+        if (orphaned.isNotEmpty()) {
+            val editor = sortPrefs.edit()
+            orphaned.forEach { editor.remove(it) }
+            editor.apply()
+        }
+    }
+
+    /**
+     * Requests the required MANAGE_EXTERNAL_STORAGE permission if not already granted.
+     */
+    private fun checkPermissionsAndLoadFiles() {
+        if (Environment.isExternalStorageManager()) {
+            loadFiles(currentPath, addToHistory = false)
+        } else {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = Uri.parse("package:${requireContext().packageName}")
+                startActivity(intent)
+            } catch (e: Exception) {
+                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                startActivity(intent)
+            }
+        }
+    }
+
+    /**
+     * Loads and displays the contents of the specified directory.
+     * @param directory The directory to list.
+     * @param addToHistory Whether to add the current path to the navigation history.
+     */
+    private fun loadFiles(directory: File, addToHistory: Boolean = true) {
+        if (addToHistory && directory.absolutePath != currentPath.absolutePath) {
+            pathHistory.add(currentPath)
+            onBackPressedCallback.isEnabled = true
+        }
+        
+        currentPath = directory
+        cleanupSortPrefs(directory)
+        
+        var files = directory.listFiles()?.toList()
+        
+        // Fallback for restricted root (/): show known readable system directories manually
+        if (files == null && directory.absolutePath == "/") {
+            val knownRoots = arrayOf("/system", "/storage", "/proc", "/sys", "/etc", "/mnt", "/vendor", "/dev")
+            files = knownRoots.map { File(it) }.filter { it.exists() }
+        }
+
+        // Fallback for restricted /storage: use StorageManager to find volumes
+        if (files == null && directory.absolutePath == "/storage") {
+            val storageManager = requireContext().getSystemService(Context.STORAGE_SERVICE) as StorageManager
+            files = storageManager.storageVolumes.mapNotNull { it.directory }
+        }
+        
+        val finalFiles = files ?: emptyList()
+        val filteredFiles = if (showHidden) finalFiles else finalFiles.filter { !it.name.startsWith(".") }
+        
+        if (filteredFiles.isEmpty()) {
+            if (!directory.canRead()) {
+                Toast.makeText(context, getString(R.string.msg_permission_denied_folder, directory.absolutePath), Toast.LENGTH_SHORT).show()
+            } else if (directory.isDirectory) {
+                Toast.makeText(context, getString(R.string.msg_directory_empty), Toast.LENGTH_SHORT).show()
+            }
+        }
+        
+        val sortedFiles = FileSorter.sortFiles(filteredFiles, currentSortType)
+        val displayList = mutableListOf<File>()
+        
+        // Add ".." entry if not at system root
+        if (currentPath.parentFile != null) {
+            displayList.add(File(currentPath, ".."))
+        }
+        
+        displayList.addAll(sortedFiles)
+        adapter.updateFiles(displayList)
+        (requireActivity() as AppCompatActivity).supportActionBar?.title = directory.absolutePath
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (Environment.isExternalStorageManager()) {
+            loadFiles(currentPath, addToHistory = false)
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+}

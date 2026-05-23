@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/DashboardFragment">
+
+    <fragment
+        android:id="@+id/DashboardFragment"
+        android:name="com.beezlesoft.fileman.DashboardFragment"
+        android:label="FileMan"
+        tools:layout="@layout/fragment_dashboard">
+        <action
+            android:id="@+id/action_DashboardFragment_to_FileListFragment"
+            app:destination="@id/FileListFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/FileListFragment"
+        android:name="com.beezlesoft.fileman.FileListFragment"
+        android:label="Files"
+        tools:layout="@layout/fragment_first">
+        <argument
+            android:name="initialPath"
+            app:argType="string"
+            android:defaultValue="" />
+    </fragment>
+</navigation>
