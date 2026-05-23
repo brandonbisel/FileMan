@@ -26,7 +26,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="18sp"
-            android:textColor="#FF1A1C1E"
             android:ellipsize="middle"
             android:singleLine="true"
             android:text="File Name" />
@@ -36,7 +35,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="14sp"
-            android:textColor="#FF43474E"
             android:text="Info" />
     </LinearLayout>
 

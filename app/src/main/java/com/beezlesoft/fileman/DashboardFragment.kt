@@ -91,11 +91,12 @@ class DashboardFragment : Fragment() {
                 menu.findItem(R.id.action_home_nav).isVisible = false
                 menu.findItem(R.id.action_home).isVisible = false
                 menu.findItem(R.id.action_app_private).isVisible = false
-                menu.findItem(R.id.action_storage).isVisible = false
                 menu.findItem(R.id.action_system).isVisible = false
                 menu.findItem(R.id.action_root).isVisible = false
                 menu.findItem(R.id.action_paste).isVisible = false
                 menu.findItem(R.id.action_sort).isVisible = false
+                menu.findItem(R.id.action_new_folder).isVisible = false
+                menu.findItem(R.id.action_search).isVisible = false
             }
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
@@ -226,22 +227,34 @@ class DashboardFragment : Fragment() {
             androidx.recyclerview.widget.RecyclerView.ViewHolder(binding.root)
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val themedContext = androidx.appcompat.view.ContextThemeWrapper(parent.context, R.style.Theme_FileMan)
-            val inflater = LayoutInflater.from(themedContext)
+            val inflater = LayoutInflater.from(parent.context)
             val binding = com.beezlesoft.fileman.databinding.ItemFileBinding.inflate(inflater, parent, false)
             return ViewHolder(binding)
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
+            val context = holder.itemView.context
+            
+            // Apply theme attributes programmatically to avoid inflation-time crashes
+            val colorPrimary = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorPrimary, 0xFF0061A4.toInt())
+            val colorOnSurface = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0xFF1A1C1E.toInt())
+            val colorOnSurfaceVariant = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFF43474E.toInt())
+            
+            val outValue = TypedValue()
+            if (context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)) {
+                holder.binding.root.setBackgroundResource(outValue.resourceId)
+            }
             
             holder.binding.fileName.text = item.title
-            holder.binding.fileIcon.setImageResource(item.iconRes)
+            holder.binding.fileName.setTextColor(colorOnSurface)
             
-            // Hardcoded M3 primary for now to prevent crashes
-            holder.binding.fileIcon.setColorFilter(0xFF0061A4.toInt())
+            holder.binding.fileIcon.setImageResource(item.iconRes)
+            holder.binding.fileIcon.setColorFilter(colorPrimary)
             
             holder.binding.fileInfo.text = item.subtitle ?: item.path.absolutePath
+            holder.binding.fileInfo.setTextColor(colorOnSurfaceVariant)
+
             holder.itemView.setOnClickListener { onClick(item) }
         }
 

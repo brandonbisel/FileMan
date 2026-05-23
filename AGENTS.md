@@ -32,13 +32,15 @@ To maintain testability, core filesystem logic is isolated from the UI:
 - Use `StorageManager.storageVolumes` in `FileListFragment` as a fallback to discover physical volumes (SD cards, USB).
 
 ### 4. Persistence
-- User settings are stored in two `SharedPreferences` files:
-  - `settings`: Global toggles (Advanced Mode, Show Hidden, Confirm Delete, Global Sort Default).
+- User settings are stored in several `SharedPreferences` files:
+  - `settings`: Global toggles (Advanced Mode, Show Hidden, Confirm Delete, Global Sort Default, Global Thumbnail Default).
   - `directory_sort_settings`: Per-directory sort overrides (Key = Absolute Path, Value = `SortType`).
-- **Orphan Cleanup**: `FileListFragment` calls `cleanupSortPrefs()` on every load to remove saved preferences for directories that no longer exist.
+  - `directory_thumbnail_settings`: Per-directory thumbnail overrides (Key = Absolute Path, Value = `Boolean`).
+- **Orphan Cleanup**: `FileListFragment` calls `cleanupDirectoryPrefs()` on every load to remove saved preferences (sort and thumbnails) for directories that no longer exist.
 
 ### 5. Media & Async Tasks
-- **Thumbnails**: Media thumbnails are loaded asynchronously in `FileAdapter` using an `ExecutorService` and `ContentResolver.loadThumbnail`.
+- **Thumbnails**: Media thumbnails are loaded asynchronously in `FileAdapter` using the **Coil** library.
+- **Video Previews**: For video files, Coil extracts a frame from **10% into the duration** to ensure a representative, non-black thumbnail.
 - **Heavy Operations**: Copying and deleting tasks use `lifecycleScope` in the Fragment and `withContext(Dispatchers.IO)` in `FileOperations`.
 
 ## Licensing & Compliance
