@@ -87,3 +87,4 @@ class FileSorterTest {
         assertEquals("b.txt", sortedFiles[1].name)
     }
 }
+

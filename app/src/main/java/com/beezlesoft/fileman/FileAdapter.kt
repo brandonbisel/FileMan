@@ -31,6 +31,8 @@ import android.widget.TextView
 import androidx.annotation.AttrRes
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.R as MaterialR
 import coil.ImageLoader
 import coil.decode.VideoFrameDecoder
 import coil.dispose
@@ -52,12 +54,24 @@ import java.util.concurrent.Executors
  * @property onItemLongClick Callback invoked when a file or directory is long-clicked (or right-clicked).
  * @property onSelectionChanged Callback invoked when the number of selected items changes.
  */
+@Suppress("TooManyFunctions")
 class FileAdapter(
     private var files: List<File>,
     private val onItemClick: (File) -> Unit,
     private val onItemLongClick: (File, View) -> Unit,
     private val onSelectionChanged: (Int) -> Unit
 ) : RecyclerView.Adapter<FileAdapter.FileViewHolder>() {
+
+    companion object {
+        private const val THUMBNAIL_PERCENT = 0.1
+        private const val CORNER_RADIUS = 8f
+        
+        private const val DEFAULT_PRIMARY = 0xFF0061A4
+        private const val DEFAULT_ON_SURFACE = 0xFF1A1C1E
+        private const val DEFAULT_ON_SURFACE_VARIANT = 0xFF43474E
+        private const val DEFAULT_OUTLINE = 0xFF73777F
+        private const val DEFAULT_SECONDARY_CONTAINER = 0xFFD1E4FF
+    }
 
     private val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     private val selectedItems = mutableSetOf<File>()
@@ -98,81 +112,127 @@ class FileAdapter(
         val file = files[position]
         val context = holder.itemView.context
         
-        // Resolve theme colors
-        val colorPrimary = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorPrimary, 0xFF0061A4.toInt())
-        val colorOnSurface = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, 0xFF1A1C1E.toInt())
-        val colorOnSurfaceVariant = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFF43474E.toInt())
-        val colorOutline = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorOutline, 0xFF73777F.toInt())
-        val colorSecondaryContainer = com.google.android.material.color.MaterialColors.getColor(context, com.google.android.material.R.attr.colorSecondaryContainer, 0xFFD1E4FF.toInt())
+        val colors = resolveColors(context)
+        bindBackground(holder, file, colors)
+        
+        val displayName = resolveDisplayName(context, file)
+        holder.binding.fileName.text = displayName
+        holder.binding.fileName.setTextColor(colors.onSurface)
+        
+        bindMetadata(holder, file, colors)
+        bindIconAndThumbnail(holder, file, colors)
+        
+        setupListeners(holder, file)
+    }
 
-        // Background handling
+    private data class AdapterColors(
+        val primary: Int,
+        val onSurface: Int,
+        val onSurfaceVariant: Int,
+        val outline: Int,
+        val secondaryContainer: Int
+    )
+
+    private fun resolveColors(context: Context): AdapterColors {
+        fun getColor(id: Int, default: Long): Int {
+            return MaterialColors.getColor(context, id, default.toInt())
+        }
+
+        return AdapterColors(
+            primary = getColor(MaterialR.attr.colorPrimary, DEFAULT_PRIMARY),
+            onSurface = getColor(MaterialR.attr.colorOnSurface, DEFAULT_ON_SURFACE),
+            onSurfaceVariant = getColor(MaterialR.attr.colorOnSurfaceVariant, DEFAULT_ON_SURFACE_VARIANT),
+            outline = getColor(MaterialR.attr.colorOutline, DEFAULT_OUTLINE),
+            secondaryContainer = getColor(MaterialR.attr.colorSecondaryContainer, DEFAULT_SECONDARY_CONTAINER)
+        )
+    }
+
+    private fun bindBackground(holder: FileViewHolder, file: File, colors: AdapterColors) {
         val isSelected = selectedItems.contains(file)
         holder.binding.root.isActivated = isSelected
         
         if (isSelected) {
-            holder.binding.root.setBackgroundColor(colorSecondaryContainer)
+            holder.binding.root.setBackgroundColor(colors.secondaryContainer)
         } else {
             val outValue = TypedValue()
-            if (context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)) {
+            val resolve = holder.itemView.context.theme.resolveAttribute(
+                android.R.attr.selectableItemBackground, outValue, true
+            )
+            if (resolve) {
                 holder.binding.root.setBackgroundResource(outValue.resourceId)
             } else {
                 holder.binding.root.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
         }
+    }
 
-        var displayName = if (file.name.isEmpty()) file.absolutePath else file.name
+    private fun resolveDisplayName(context: Context, file: File): String {
+        if (file.name == "..") return ".."
         
-        // Resolve friendly names for storage volume roots
+        val baseName = if (file.name.isEmpty()) file.absolutePath else file.name
+        
         val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
         val volume = storageManager.storageVolumes.find { it.directory?.absolutePath == file.absolutePath }
-        if (volume != null) {
-            displayName = if (volume.isPrimary) context.getString(R.string.menu_internal_storage)
-            else volume.getDescription(context)
-        }
         
-        holder.binding.fileName.text = displayName
-        holder.binding.fileName.setTextColor(colorOnSurface)
-        
-        val size = if (file.isDirectory) "" else Formatter.formatShortFileSize(context, file.length())
-        val date = dateFormat.format(Date(file.lastModified()))
-        holder.binding.fileInfo.setTextColor(colorOnSurfaceVariant)
+        return volume?.let { 
+            if (it.isPrimary) context.getString(R.string.menu_internal_storage)
+            else it.getDescription(context)
+        } ?: baseName
+    }
 
-        // Set base icon and color
+    private fun bindMetadata(holder: FileViewHolder, file: File, colors: AdapterColors) {
+        val context = holder.itemView.context
+        holder.binding.fileInfo.setTextColor(colors.onSurfaceVariant)
+        
+        if (file.name == "..") {
+            holder.binding.fileInfo.text = context.getString(R.string.file_info_parent_dir)
+        } else {
+            val size = if (file.isDirectory) "" else Formatter.formatShortFileSize(context, file.length())
+            val date = dateFormat.format(Date(file.lastModified()))
+            holder.binding.fileInfo.text = if (size.isEmpty()) date else "$size • $date"
+        }
+    }
+
+    private fun bindIconAndThumbnail(holder: FileViewHolder, file: File, colors: AdapterColors) {
+        val context = holder.itemView.context
         val iconRes = if (file.name == "..") R.drawable.ic_folder else getIconForFile(file)
         val isNavFolder = file.isDirectory || file.name == ".."
-        val tintColor = if (isNavFolder && file.name != "..") colorPrimary else colorOutline
+        val tintColor = if (isNavFolder && file.name != "..") colors.primary else colors.outline
 
-        // Always reset icon state to baseline
         holder.binding.fileIcon.dispose()
         holder.binding.fileIcon.setImageResource(iconRes)
         holder.binding.fileIcon.setColorFilter(tintColor)
 
-        if (file.name == "..") {
-            holder.binding.fileName.text = ".."
-            holder.binding.fileInfo.text = context.getString(R.string.file_info_parent_dir)
-        } else {
-            holder.binding.fileInfo.text = if (size.isEmpty()) date else "$size • $date"
-
+        if (file.name != "..") {
             val extension = file.extension.lowercase()
             val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: ""
             
-            val isImage = mimeType.startsWith("image/") || extension in setOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
-            val isVideo = mimeType.startsWith("video/") || extension in setOf("mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "3gp", "ts", "mpg", "mpeg", "m4v")
+            val imgExts = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp")
+            val vidExts = setOf(
+                "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", 
+                "3gp", "ts", "mpg", "mpeg", "m4v"
+            )
 
-            if (showThumbnails && !file.isDirectory && (isImage || isVideo)) {
+            val isImage = mimeType.startsWith("image/") || extension in imgExts
+            val isVideo = mimeType.startsWith("video/") || extension in vidExts
+
+            val canShowMedia = showThumbnails && !file.isDirectory
+            if (canShowMedia && (isImage || isVideo)) {
                 holder.binding.fileIcon.load(file, getImageLoader(context)) {
                     crossfade(true)
                     placeholder(iconRes)
                     error(iconRes)
-                    if (isVideo) videoFramePercent(0.1)
-                    transformations(RoundedCornersTransformation(8f))
+                    if (isVideo) videoFramePercent(THUMBNAIL_PERCENT)
+                    transformations(RoundedCornersTransformation(CORNER_RADIUS))
                     listener(onSuccess = { _, _ -> 
                         holder.binding.fileIcon.clearColorFilter()
                     })
                 }
             }
         }
-        
+    }
+
+    private fun setupListeners(holder: FileViewHolder, file: File) {
         holder.itemView.setOnClickListener {
             if (multiSelectMode && file.name != "..") {
                 toggleSelection(file)
@@ -245,10 +305,5 @@ class FileAdapter(
         files = newFiles
         notifyDataSetChanged()
     }
-
-    private fun Context.getColorFromAttr(@AttrRes attrColor: Int): Int {
-        val typedValue = TypedValue()
-        theme.resolveAttribute(attrColor, typedValue, true)
-        return typedValue.data
-    }
 }
+
