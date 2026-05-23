@@ -2,9 +2,9 @@ name: Android CI
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "release/*", "groom/*" ]
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "release/*", "groom/*" ]
 
 jobs:
   build:
@@ -12,6 +12,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: set up JDK 17
       uses: actions/setup-java@v4
@@ -31,20 +33,35 @@ jobs:
 
     - name: Rename and Upload APK Artifact
       run: |
-        if [ "${{ github.ref_name }}" == "main" ]; then
-          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/FileMan.apk
+        BRANCH_NAME="${{ github.ref_name }}"
+        RUN_NUM="${{ github.run_number }}"
+        
+        if [[ $BRANCH_NAME == release/* ]]; then
+          VERSION="${BRANCH_NAME#release/}"
+          # Calculate RC number based on commits since branching from dev
+          BASE_COMMIT=$(git merge-base origin/dev HEAD)
+          RC_NUM=$(git rev-list --count $BASE_COMMIT..HEAD)
+          RC_NUM=$((RC_NUM + 1))
+          
+          FILENAME="FileMan-${VERSION}-RC${RC_NUM}.apk"
+          ARTIFACT_NAME="FileMan-${VERSION}-RC${RC_NUM}"
+        elif [ "$BRANCH_NAME" == "main" ]; then
+          FILENAME="FileMan.apk"
+          ARTIFACT_NAME="FileMan-latest"
+        else
+          # dev, groom, or other branches
+          SAFE_NAME="${BRANCH_NAME//\//-}"
+          FILENAME="FileMan-${SAFE_NAME}-build-${RUN_NUM}.apk"
+          ARTIFACT_NAME="FileMan-${SAFE_NAME}-build-${RUN_NUM}"
         fi
-        mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/FileMan-${{ github.ref_name }}-build-${{ github.run_number }}.apk
+        
+        echo "APK_FILENAME=$FILENAME" >> $GITHUB_ENV
+        echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
+        
+        cp app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/debug/$FILENAME"
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: FileMan-${{ github.ref_name }}-build-${{ github.run_number }}
-        path: app/build/outputs/apk/debug/FileMan-${{ github.ref_name }}-build-${{ github.run_number }}.apk
-
-    - name: Upload Generic Main APK Artifact
-      if: github.ref_name == 'main'
-      uses: actions/upload-artifact@v4
-      with:
-        name: FileMan-latest
-        path: app/build/outputs/apk/debug/FileMan.apk
+        name: ${{ env.ARTIFACT_NAME }}
+        path: app/build/outputs/apk/debug/${{ env.APK_FILENAME }}
