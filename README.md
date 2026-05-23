@@ -35,6 +35,7 @@ This app requires the `MANAGE_EXTERNAL_STORAGE` permission (All Files Access) to
 - **Security**: Uses `androidx.core.content.FileProvider` for secure file sharing.
 - **Storage Discovery**: Uses `StorageManager` to reliably find physical storage volumes.
 - **Persistence**: Remembers user settings and directory preferences via SharedPreferences.
+- **CI/CD**: Integrated with **GitHub Actions** for automated builds and testing.
 - **Testing**: Robust Unit tests for core logic and Espresso tests for UI.
 
 ## Building the Project

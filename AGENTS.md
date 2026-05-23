@@ -54,6 +54,12 @@ To maintain testability, core filesystem logic is isolated from the UI:
 - **Logic Tests**: Found in `app/src/test`. These should remain 100% passing and do not require an emulator.
 - **UI Tests**: Found in `app/src/androidTest`. Use Espresso to verify Dashboard and FileList availability.
 
+## CI/CD
+
+The project uses **GitHub Actions** for Continuous Integration.
+- **Workflow**: `.github/workflows/android-ci.yml`
+- **Automation**: Automatically builds the app and runs unit tests on every push or pull request to `main` and `dev`.
+
 ## Git Workflow
 
 The project follows a rigorous **Git Flow** pattern to ensure stability and traceability:
