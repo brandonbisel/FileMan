@@ -10,10 +10,16 @@ A clean, functional Android file manager built with modern Android development p
 - **History-Based Navigation**: The back button retraces your steps through visited folders.
 - **Parent Directory Shortcut**: Familiar `..` entry at the top of every listing.
 - **File Operations**:
-  - Copy and Move (Paste)
+  - **Create New Folder**
+  - **Share Files** to other apps
+  - Copy and Move (Paste) with support for **Multi-Selection**
   - Rename
   - Delete (Recursive for directories, with optional confirmation)
   - View File Details
+- **Search**: Fast, real-time file searching by name.
+- **Media Support**: High-quality **image and video thumbnails** in the file list.
+- **Bookmarks / Favorites**: Pin frequently used folders for instant access from the Dashboard.
+- **Background Threading**: Long-running file tasks occur in the background with a **progress indicator**.
 - **Open Files**: Seamlessly open files with their corresponding system applications using `FileProvider`.
 - **Sorting**: Sort files by Name, Size, or Last Modified date.
 - **Per-Directory Memory**: Remembers your preferred sort order for each folder individually.

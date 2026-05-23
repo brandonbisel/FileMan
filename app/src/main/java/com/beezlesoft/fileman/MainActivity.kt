@@ -38,7 +38,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        DynamicColors.applyToActivitiesIfAvailable(application)
+        setTheme(R.style.Theme_FileMan)
+        DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
