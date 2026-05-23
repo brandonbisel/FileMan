@@ -4,7 +4,7 @@
     tools:context="com.beezlesoft.fileman.MainActivity">
     <item
         android:id="@+id/action_search"
-        android:icon="@android:drawable/ic_menu_search"
+        android:icon="@drawable/ic_search"
         android:title="@string/menu_search"
         app:showAsAction="ifRoom|collapseActionView"
         app:actionViewClass="androidx.appcompat.widget.SearchView" />
@@ -31,6 +31,7 @@
         app:showAsAction="always" />
     <item
         android:id="@+id/action_paste"
+        android:icon="@drawable/ic_paste"
         android:title="@string/menu_paste"
         app:showAsAction="ifRoom"
         android:visible="false" />
@@ -45,10 +46,6 @@
     <item
         android:id="@+id/action_app_private"
         android:title="@string/menu_app_private"
-        app:showAsAction="never" />
-    <item
-        android:id="@+id/action_storage"
-        android:title="@string/menu_storage_devices"
         app:showAsAction="never" />
     <item
         android:id="@+id/action_system"

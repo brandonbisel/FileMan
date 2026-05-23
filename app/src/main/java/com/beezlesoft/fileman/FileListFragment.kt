@@ -72,6 +72,7 @@ class FileListFragment : Fragment() {
 
     private val prefs by lazy { requireContext().getSharedPreferences("settings", Context.MODE_PRIVATE) }
     private val sortPrefs by lazy { requireContext().getSharedPreferences("directory_sort_settings", Context.MODE_PRIVATE) }
+    private val thumbnailPrefs by lazy { requireContext().getSharedPreferences("directory_thumbnail_settings", Context.MODE_PRIVATE) }
     private val favoritePrefs by lazy { requireContext().getSharedPreferences("favorites", Context.MODE_PRIVATE) }
 
     /**
@@ -115,6 +116,29 @@ class FileListFragment : Fragment() {
                 sortPrefs.edit().remove(currentPath.absolutePath).apply()
             } else {
                 sortPrefs.edit().putString(currentPath.absolutePath, value.name).apply()
+            }
+        }
+
+    /**
+     * The global default for showing media thumbnails.
+     */
+    private var globalShowThumbnails: Boolean
+        get() = prefs.getBoolean("show_thumbnails", true)
+        set(value) = prefs.edit().putBoolean("show_thumbnails", value).apply()
+
+    /**
+     * Whether to show thumbnails for the current directory, falling back to the global default.
+     */
+    private var currentShowThumbnails: Boolean
+        get() {
+            if (!thumbnailPrefs.contains(currentPath.absolutePath)) return globalShowThumbnails
+            return thumbnailPrefs.getBoolean(currentPath.absolutePath, globalShowThumbnails)
+        }
+        set(value) {
+            if (value == globalShowThumbnails) {
+                thumbnailPrefs.edit().remove(currentPath.absolutePath).apply()
+            } else {
+                thumbnailPrefs.edit().putBoolean(currentPath.absolutePath, value).apply()
             }
         }
 
@@ -231,10 +255,6 @@ class FileListFragment : Fragment() {
                     }
                     R.id.action_root -> {
                         loadFiles(File("/"))
-                        true
-                    }
-                    R.id.action_storage -> {
-                        loadFiles(File("/storage"))
                         true
                     }
                     R.id.action_system -> {
@@ -708,9 +728,18 @@ class FileListFragment : Fragment() {
             getString(R.string.dialog_settings_advanced), 
             getString(R.string.dialog_settings_hidden_files),
             getString(R.string.dialog_settings_confirm_delete),
-            getString(R.string.dialog_settings_global_sort)
+            getString(R.string.dialog_settings_global_sort),
+            getString(R.string.dialog_settings_show_thumbnails),
+            getString(R.string.dialog_settings_global_thumbnails)
         )
-        val checked = booleanArrayOf(showAdvanced, showHidden, confirmDelete, false)
+        val checked = booleanArrayOf(
+            showAdvanced, 
+            showHidden, 
+            confirmDelete, 
+            false, 
+            currentShowThumbnails, 
+            false
+        )
 
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.dialog_settings_title)
@@ -736,6 +765,17 @@ class FileListFragment : Fragment() {
                             Toast.makeText(context, getString(R.string.msg_global_sort_set, currentSortType.name), Toast.LENGTH_SHORT).show()
                         }
                     }
+                    4 -> {
+                        currentShowThumbnails = isChecked
+                        adapter.setShowThumbnails(isChecked)
+                        loadFiles(currentPath, addToHistory = false)
+                    }
+                    5 -> {
+                        if (isChecked) {
+                            globalShowThumbnails = currentShowThumbnails
+                            Toast.makeText(context, getString(R.string.msg_global_thumbnails_set, globalShowThumbnails), Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
             }
             .setPositiveButton(R.string.dialog_close, null)
@@ -743,14 +783,20 @@ class FileListFragment : Fragment() {
     }
 
     /**
-     * Removes saved sort preferences for subdirectories of [parentDir] that no longer exist on disk.
-     * This prevents the settings database from being cluttered with paths to deleted folders.
+     * Removes saved preferences (sort, thumbnails) for subdirectories of [parentDir] that no longer exist on disk.
      */
-    private fun cleanupSortPrefs(parentDir: File) {
-        val orphaned = FileOperations.getOrphanedPrefKeys(parentDir, sortPrefs.all.keys)
-        if (orphaned.isNotEmpty()) {
+    private fun cleanupDirectoryPrefs(parentDir: File) {
+        val orphanedSort = FileOperations.getOrphanedPrefKeys(parentDir, sortPrefs.all.keys)
+        val orphanedThumb = FileOperations.getOrphanedPrefKeys(parentDir, thumbnailPrefs.all.keys)
+        
+        if (orphanedSort.isNotEmpty()) {
             val editor = sortPrefs.edit()
-            orphaned.forEach { editor.remove(it) }
+            orphanedSort.forEach { editor.remove(it) }
+            editor.apply()
+        }
+        if (orphanedThumb.isNotEmpty()) {
+            val editor = thumbnailPrefs.edit()
+            orphanedThumb.forEach { editor.remove(it) }
             editor.apply()
         }
     }
@@ -812,7 +858,8 @@ class FileListFragment : Fragment() {
         }
         
         currentPath = directory
-        cleanupSortPrefs(directory)
+        cleanupDirectoryPrefs(directory)
+        adapter.setShowThumbnails(currentShowThumbnails)
         
         var files = directory.listFiles()?.toList()
         
@@ -832,7 +879,17 @@ class FileListFragment : Fragment() {
         allFiles = finalFiles // Full list, filtering happens in filterFiles()
         
         filterFiles()
-        (requireActivity() as AppCompatActivity).supportActionBar?.title = directory.absolutePath
+        
+        // Use friendly name for title if at storage root
+        var displayTitle = directory.absolutePath
+        val storageManager = requireContext().getSystemService(Context.STORAGE_SERVICE) as StorageManager
+        val volume = storageManager.storageVolumes.find { it.directory?.absolutePath == directory.absolutePath }
+        if (volume != null) {
+            displayTitle = if (volume.isPrimary) getString(R.string.menu_internal_storage)
+            else volume.getDescription(requireContext())
+        }
+        
+        (requireActivity() as AppCompatActivity).supportActionBar?.title = displayTitle
     }
 
     override fun onResume() {

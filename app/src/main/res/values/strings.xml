@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">FileMan Plus</string>
+    <string name="app_name">FileMan</string>
     <string name="action_settings">Settings</string>
 
     <!-- Main Menu -->
@@ -38,6 +38,8 @@
     <string name="dialog_settings_hidden_files">Show Hidden Files</string>
     <string name="dialog_settings_confirm_delete">Confirm on Delete</string>
     <string name="dialog_settings_global_sort">Set Current Sort as Global Default</string>
+    <string name="dialog_settings_show_thumbnails">Show Media Thumbnails</string>
+    <string name="dialog_settings_global_thumbnails">Set Current Thumbnail View as Global Default</string>
     <string name="dialog_close">Close</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_ok">OK</string>
@@ -65,6 +67,7 @@
     <string name="msg_favorite_added">Added to favorites</string>
     <string name="msg_favorite_removed">Removed from favorites</string>
     <string name="msg_global_sort_set">Global default set to %s</string>
+    <string name="msg_global_thumbnails_set">Global thumbnail default set to %b</string>
     <string name="msg_processing">Processing&#8230;</string>
 
     <!-- File Info Labels -->
