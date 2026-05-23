@@ -8,12 +8,12 @@
         app:showAsAction="ifRoom" />
     <item
         android:id="@+id/action_copy"
-        android:icon="@android:drawable/ic_menu_copy"
+        android:icon="@drawable/ic_copy"
         android:title="@string/menu_copy"
         app:showAsAction="ifRoom" />
     <item
         android:id="@+id/action_move"
-        android:icon="@android:drawable/ic_menu_set_as"
+        android:icon="@drawable/ic_move"
         android:title="@string/menu_move"
         app:showAsAction="ifRoom" />
     <item
