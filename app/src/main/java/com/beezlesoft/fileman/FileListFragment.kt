@@ -63,6 +63,9 @@ class FileListFragment : Fragment() {
     private var currentPath: File = Environment.getExternalStorageDirectory()
     private val rootPath: File = File("/")
 
+    private var allFiles: List<File> = emptyList()
+    private var currentQuery: String = ""
+
     private val prefs by lazy { requireContext().getSharedPreferences("settings", Context.MODE_PRIVATE) }
     private val sortPrefs by lazy { requireContext().getSharedPreferences("directory_sort_settings", Context.MODE_PRIVATE) }
 
@@ -170,6 +173,17 @@ class FileListFragment : Fragment() {
                 menu.findItem(R.id.action_root).isVisible = showAdvanced
                 menu.findItem(R.id.action_app_private).isVisible = showAdvanced
                 menu.findItem(R.id.action_paste).isVisible = clipboardFile != null
+
+                val searchItem = menu.findItem(R.id.action_search)
+                val searchView = searchItem.actionView as androidx.appcompat.widget.SearchView
+                searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+                    override fun onQueryTextSubmit(query: String?): Boolean = false
+                    override fun onQueryTextChange(newText: String?): Boolean {
+                        currentQuery = newText ?: ""
+                        filterFiles()
+                        return true
+                    }
+                })
             }
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
@@ -586,6 +600,36 @@ class FileListFragment : Fragment() {
     }
 
     /**
+     * Filters the current file list based on the [currentQuery].
+     */
+    private fun filterFiles() {
+        val filtered = if (currentQuery.isEmpty()) {
+            allFiles
+        } else {
+            allFiles.filter { it.name.contains(currentQuery, ignoreCase = true) }
+        }
+
+        if (filtered.isEmpty()) {
+            if (!currentPath.canRead()) {
+                Toast.makeText(context, getString(R.string.msg_permission_denied_folder, currentPath.absolutePath), Toast.LENGTH_SHORT).show()
+            } else if (currentPath.isDirectory && currentQuery.isEmpty()) {
+                Toast.makeText(context, getString(R.string.msg_directory_empty), Toast.LENGTH_SHORT).show()
+            }
+        }
+        
+        val sortedFiles = FileSorter.sortFiles(filtered, currentSortType)
+        val displayList = mutableListOf<File>()
+        
+        // Add ".." entry if not at system root and not searching
+        if (currentPath.parentFile != null && currentQuery.isEmpty()) {
+            displayList.add(File(currentPath, ".."))
+        }
+        
+        displayList.addAll(sortedFiles)
+        adapter.updateFiles(displayList)
+    }
+
+    /**
      * Loads and displays the contents of the specified directory.
      * @param directory The directory to list.
      * @param addToHistory Whether to add the current path to the navigation history.
@@ -614,26 +658,9 @@ class FileListFragment : Fragment() {
         }
         
         val finalFiles = files ?: emptyList()
-        val filteredFiles = if (showHidden) finalFiles else finalFiles.filter { !it.name.startsWith(".") }
+        allFiles = if (showHidden) finalFiles else finalFiles.filter { !it.name.startsWith(".") }
         
-        if (filteredFiles.isEmpty()) {
-            if (!directory.canRead()) {
-                Toast.makeText(context, getString(R.string.msg_permission_denied_folder, directory.absolutePath), Toast.LENGTH_SHORT).show()
-            } else if (directory.isDirectory) {
-                Toast.makeText(context, getString(R.string.msg_directory_empty), Toast.LENGTH_SHORT).show()
-            }
-        }
-        
-        val sortedFiles = FileSorter.sortFiles(filteredFiles, currentSortType)
-        val displayList = mutableListOf<File>()
-        
-        // Add ".." entry if not at system root
-        if (currentPath.parentFile != null) {
-            displayList.add(File(currentPath, ".."))
-        }
-        
-        displayList.addAll(sortedFiles)
-        adapter.updateFiles(displayList)
+        filterFiles()
         (requireActivity() as AppCompatActivity).supportActionBar?.title = directory.absolutePath
     }
 
