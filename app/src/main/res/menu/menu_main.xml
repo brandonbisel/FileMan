@@ -29,6 +29,10 @@
         app:showAsAction="ifRoom"
         android:visible="false" />
     <item
+        android:id="@+id/action_new_folder"
+        android:title="@string/menu_new_folder"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_home"
         android:title="@string/menu_internal_storage"
         app:showAsAction="never" />

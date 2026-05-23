@@ -3,6 +3,7 @@
     <string name="action_settings">Settings</string>
 
     <!-- Main Menu -->
+    <string name="menu_new_folder">New Folder</string>
     <string name="menu_dashboard">Dashboard</string>
     <string name="menu_paste">Paste</string>
     <string name="menu_sort_by">Sort by</string>
@@ -43,6 +44,8 @@
     <string name="msg_file_exists">A file with that name already exists</string>
     <string name="msg_renamed_success">Renamed successfully</string>
     <string name="msg_rename_failed">Rename failed</string>
+    <string name="msg_folder_created_success">Folder created successfully</string>
+    <string name="msg_folder_create_failed">Failed to create folder</string>
     <string name="msg_copied_success">Copied successfully</string>
     <string name="msg_moved_success">Moved successfully</string>
     <string name="msg_moved_success_fallback">Moved successfully (copied &amp; deleted)</string>
