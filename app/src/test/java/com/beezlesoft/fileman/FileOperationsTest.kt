@@ -21,6 +21,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import kotlinx.coroutines.runBlocking
 
 class FileOperationsTest {
 
@@ -28,7 +29,7 @@ class FileOperationsTest {
     val tempFolder = TemporaryFolder()
 
     @Test
-    fun testCopyRecursive() {
+    fun testCopyRecursive() = runBlocking {
         val sourceDir = tempFolder.newFolder("source")
         val subDir = File(sourceDir, "sub")
         subDir.mkdir()
@@ -46,7 +47,7 @@ class FileOperationsTest {
     }
 
     @Test
-    fun testDeleteRecursive() {
+    fun testDeleteRecursive() = runBlocking {
         val dir = tempFolder.newFolder("toDelete")
         val subDir = File(dir, "sub")
         subDir.mkdir()
