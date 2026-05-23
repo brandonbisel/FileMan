@@ -65,6 +65,7 @@
     <string name="msg_favorite_added">Added to favorites</string>
     <string name="msg_favorite_removed">Removed from favorites</string>
     <string name="msg_global_sort_set">Global default set to %s</string>
+    <string name="msg_processing">Processing&#8230;</string>
 
     <!-- File Info Labels -->
     <string name="file_info_placeholder">Size | Date</string>

@@ -43,10 +43,12 @@ import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.beezlesoft.fileman.databinding.FragmentFirstBinding
 import java.io.File
+import kotlinx.coroutines.launch
 
 /**
  * The primary fragment responsible for displaying the file list and handling user interactions.
@@ -541,36 +543,41 @@ class FileListFragment : Fragment() {
      */
     private fun performPaste() {
         val sources = clipboardFiles ?: return
-        var successCount = 0
+        val dialog = showProgressDialog(getString(R.string.menu_paste))
 
-        try {
-            sources.forEach { source ->
-                val destination = File(currentPath, source.name)
-                if (!destination.exists()) {
-                    if (isMoveOperation) {
-                        if (source.renameTo(destination)) {
-                            successCount++
+        lifecycleScope.launch {
+            var successCount = 0
+            try {
+                sources.forEach { source ->
+                    val destination = File(currentPath, source.name)
+                    if (!destination.exists()) {
+                        if (isMoveOperation) {
+                            if (source.renameTo(destination)) {
+                                successCount++
+                            } else {
+                                FileOperations.copyRecursive(source, destination)
+                                FileOperations.deleteRecursive(source)
+                                successCount++
+                            }
                         } else {
                             FileOperations.copyRecursive(source, destination)
-                            FileOperations.deleteRecursive(source)
                             successCount++
                         }
-                    } else {
-                        FileOperations.copyRecursive(source, destination)
-                        successCount++
                     }
                 }
+                
+                if (successCount > 0) {
+                    Toast.makeText(context, if (isMoveOperation) getString(R.string.msg_moved_success) else getString(R.string.msg_copied_success), Toast.LENGTH_SHORT).show()
+                }
+                
+                clipboardFiles = null
+                requireActivity().invalidateOptionsMenu()
+                loadFiles(currentPath, addToHistory = false)
+            } catch (e: Exception) {
+                Toast.makeText(context, getString(R.string.msg_operation_failed, e.message), Toast.LENGTH_LONG).show()
+            } finally {
+                dialog.dismiss()
             }
-            
-            if (successCount > 0) {
-                Toast.makeText(context, if (isMoveOperation) getString(R.string.msg_moved_success) else getString(R.string.msg_copied_success), Toast.LENGTH_SHORT).show()
-            }
-            
-            clipboardFiles = null
-            requireActivity().invalidateOptionsMenu()
-            loadFiles(currentPath, addToHistory = false)
-        } catch (e: Exception) {
-            Toast.makeText(context, getString(R.string.msg_operation_failed, e.message), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -594,19 +601,24 @@ class FileListFragment : Fragment() {
     }
 
     private fun performDelete(file: File) {
-        if (FileOperations.deleteRecursive(file)) {
-            Toast.makeText(context, getString(R.string.msg_deleted_success), Toast.LENGTH_SHORT).show()
-            loadFiles(currentPath, addToHistory = false)
-        } else {
-            Toast.makeText(context, getString(R.string.msg_delete_failed), Toast.LENGTH_SHORT).show()
+        val dialog = showProgressDialog(getString(R.string.menu_delete))
+        lifecycleScope.launch {
+            try {
+                if (FileOperations.deleteRecursive(file)) {
+                    Toast.makeText(context, getString(R.string.msg_deleted_success), Toast.LENGTH_SHORT).show()
+                    loadFiles(currentPath, addToHistory = false)
+                } else {
+                    Toast.makeText(context, getString(R.string.msg_delete_failed), Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                dialog.dismiss()
+            }
         }
     }
 
     private fun showBulkDeleteConfirmation(files: List<File>) {
         if (!confirmDelete) {
-            files.forEach { FileOperations.deleteRecursive(it) }
-            loadFiles(currentPath, addToHistory = false)
-            actionMode?.finish()
+            performBulkDelete(files)
             return
         }
 
@@ -614,11 +626,33 @@ class FileListFragment : Fragment() {
             .setTitle(R.string.dialog_confirm_delete_title)
             .setMessage("Are you sure you want to delete ${files.size} items?")
             .setPositiveButton(R.string.menu_delete) { _, _ ->
+                performBulkDelete(files)
+            }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
+    }
+
+    private fun performBulkDelete(files: List<File>) {
+        val dialog = showProgressDialog(getString(R.string.menu_delete))
+        lifecycleScope.launch {
+            try {
                 files.forEach { FileOperations.deleteRecursive(it) }
                 loadFiles(currentPath, addToHistory = false)
                 actionMode?.finish()
+            } finally {
+                dialog.dismiss()
             }
-            .setNegativeButton(R.string.dialog_cancel, null)
+        }
+    }
+
+    private fun showProgressDialog(title: String): AlertDialog {
+        val view = layoutInflater.inflate(R.layout.layout_progress, null)
+        val message = view.findViewById<android.widget.TextView>(R.id.progressMessage)
+        message.text = title
+        
+        return AlertDialog.Builder(requireContext())
+            .setView(view)
+            .setCancelable(false)
             .show()
     }
 

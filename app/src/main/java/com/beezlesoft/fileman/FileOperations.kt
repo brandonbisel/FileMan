@@ -16,9 +16,11 @@
 
 package com.beezlesoft.fileman
 
+import kotlinx.coroutines.Dispatchers
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import kotlinx.coroutines.withContext
 
 /**
  * Utility object for performing recursive file and directory operations.
@@ -30,19 +32,31 @@ object FileOperations {
      * 
      * @param source The source file or directory.
      * @param destination The target destination path.
+     * @param onProgress Optional callback for reporting progress (copied items count).
      */
-    fun copyRecursive(source: File, destination: File) {
-        if (source.isDirectory) {
-            if (!destination.exists()) destination.mkdirs()
-            source.list()?.forEach { child ->
-                copyRecursive(File(source, child), File(destination, child))
-            }
-        } else {
-            FileInputStream(source).use { input ->
-                FileOutputStream(destination).use { output ->
-                    input.copyTo(output)
+    suspend fun copyRecursive(source: File, destination: File, onProgress: ((Int) -> Unit)? = null) {
+        var totalCopied = 0
+        copyRecursiveInternal(source, destination) {
+            totalCopied++
+            onProgress?.invoke(totalCopied)
+        }
+    }
+
+    private suspend fun copyRecursiveInternal(source: File, destination: File, onItemCopied: suspend () -> Unit) {
+        withContext(Dispatchers.IO) {
+            if (source.isDirectory) {
+                if (!destination.exists()) destination.mkdirs()
+                source.list()?.forEach { child ->
+                    copyRecursiveInternal(File(source, child), File(destination, child), onItemCopied)
+                }
+            } else {
+                FileInputStream(source).use { input ->
+                    FileOutputStream(destination).use { output ->
+                        input.copyTo(output)
+                    }
                 }
             }
+            onItemCopied()
         }
     }
 
@@ -52,11 +66,11 @@ object FileOperations {
      * @param file The file or directory to delete.
      * @return True if the operation was successful, false otherwise.
      */
-    fun deleteRecursive(file: File): Boolean {
+    suspend fun deleteRecursive(file: File): Boolean = withContext(Dispatchers.IO) {
         if (file.isDirectory) {
             file.listFiles()?.forEach { deleteRecursive(it) }
         }
-        return file.delete()
+        file.delete()
     }
 
     /**
