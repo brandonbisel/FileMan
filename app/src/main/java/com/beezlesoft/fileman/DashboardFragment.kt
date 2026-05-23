@@ -18,6 +18,7 @@ package com.beezlesoft.fileman
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Environment
 import android.os.storage.StorageManager
 import android.text.format.Formatter
 import android.util.TypedValue
@@ -110,6 +111,7 @@ class DashboardFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
+        val currentContext = context ?: return
         val items = mutableListOf<DashboardItem>()
         
         // Add Favorites
@@ -127,38 +129,44 @@ class DashboardFragment : Fragment() {
         }
 
         // Use StorageManager to find all available volumes
-        val storageManager = requireContext().getSystemService(Context.STORAGE_SERVICE) as StorageManager
-        val primaryVolumePath = requireContext().getExternalFilesDir(null)?.absolutePath?.substringBefore("/Android") ?: ""
+        try {
+            val storageManager = currentContext.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+            val primaryVolumePath = currentContext.getExternalFilesDir(null)?.absolutePath?.substringBefore("/Android") ?: ""
 
-        storageManager.storageVolumes.forEach { volume ->
-            val path = volume.directory
-            if (path != null) {
-                val absolutePath = path.absolutePath
-                val title = if (volume.isPrimary) {
-                    getString(R.string.menu_internal_storage)
-                } else {
-                    // Skip if this is a redundant view of the primary storage
-                    if (absolutePath == primaryVolumePath || primaryVolumePath.startsWith(absolutePath)) {
-                        return@forEach
+            storageManager.storageVolumes.forEach { volume ->
+                val path = volume.directory
+                if (path != null) {
+                    val absolutePath = path.absolutePath
+                    val title = if (volume.isPrimary) {
+                        getString(R.string.menu_internal_storage)
+                    } else {
+                        // Skip if this is a redundant view of the primary storage
+                        if (absolutePath == primaryVolumePath || primaryVolumePath.startsWith(absolutePath)) {
+                            return@forEach
+                        }
+                        volume.getDescription(currentContext)
                     }
-                    volume.getDescription(requireContext())
-                }
 
-                // Calculate capacity
-                val totalSpace = path.totalSpace
-                val freeSpace = path.usableSpace
-                val usedSpace = totalSpace - freeSpace
-                
-                val capacityStr = if (totalSpace > 0) {
-                    val used = Formatter.formatShortFileSize(requireContext(), usedSpace)
-                    val total = Formatter.formatShortFileSize(requireContext(), totalSpace)
-                    "$used used of $total • $absolutePath"
-                } else {
-                    absolutePath
-                }
+                    // Calculate capacity
+                    val totalSpace = path.totalSpace
+                    val freeSpace = path.usableSpace
+                    val usedSpace = totalSpace - freeSpace
+                    
+                    val capacityStr = if (totalSpace > 0) {
+                        val used = Formatter.formatShortFileSize(currentContext, usedSpace)
+                        val total = Formatter.formatShortFileSize(currentContext, totalSpace)
+                        "$used used of $total • $absolutePath"
+                    } else {
+                        absolutePath
+                    }
 
-                items.add(DashboardItem(title, R.drawable.ic_folder, path, capacityStr))
+                    items.add(DashboardItem(title, R.drawable.ic_folder, path, capacityStr))
+                }
             }
+        } catch (e: Exception) {
+            // Fallback: Add at least the primary storage if volume discovery fails
+            val internalStorage = Environment.getExternalStorageDirectory()
+            items.add(DashboardItem(getString(R.string.menu_internal_storage), R.drawable.ic_folder, internalStorage))
         }
 
         if (showAdvanced) {
@@ -214,32 +222,29 @@ class DashboardFragment : Fragment() {
         private val onClick: (DashboardItem) -> Unit
     ) : androidx.recyclerview.widget.RecyclerView.Adapter<DashboardAdapter.ViewHolder>() {
 
-        class ViewHolder(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
-            val icon: android.widget.ImageView = view.findViewById(R.id.fileIcon)
-            val title: android.widget.TextView = view.findViewById(R.id.fileName)
-            val info: android.widget.TextView = view.findViewById(R.id.fileInfo)
-        }
+        class ViewHolder(val binding: com.beezlesoft.fileman.databinding.ItemFileBinding) : 
+            androidx.recyclerview.widget.RecyclerView.ViewHolder(binding.root)
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_file, parent, false)
-            return ViewHolder(view)
+            val themedContext = androidx.appcompat.view.ContextThemeWrapper(parent.context, R.style.Theme_FileMan)
+            val inflater = LayoutInflater.from(themedContext)
+            val binding = com.beezlesoft.fileman.databinding.ItemFileBinding.inflate(inflater, parent, false)
+            return ViewHolder(binding)
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
-            holder.title.text = item.title
-            holder.icon.setImageResource(item.iconRes)
-            holder.icon.setColorFilter(holder.itemView.context.getColorFromAttr(com.google.android.material.R.attr.colorPrimary))
-            holder.info.text = item.subtitle ?: item.path.absolutePath
+            
+            holder.binding.fileName.text = item.title
+            holder.binding.fileIcon.setImageResource(item.iconRes)
+            
+            // Hardcoded M3 primary for now to prevent crashes
+            holder.binding.fileIcon.setColorFilter(0xFF0061A4.toInt())
+            
+            holder.binding.fileInfo.text = item.subtitle ?: item.path.absolutePath
             holder.itemView.setOnClickListener { onClick(item) }
         }
 
         override fun getItemCount() = items.size
-
-        private fun Context.getColorFromAttr(@AttrRes attrColor: Int): Int {
-            val typedValue = TypedValue()
-            theme.resolveAttribute(attrColor, typedValue, true)
-            return typedValue.data
-        }
     }
 }

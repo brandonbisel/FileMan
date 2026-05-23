@@ -18,12 +18,14 @@ FileMan follows a **Single-Activity** architecture using **Jetpack Navigation**.
 ### 1. Separation of Concerns
 To maintain testability, core filesystem logic is isolated from the UI:
 - **`FileSorter`**: Logic for sorting lists of files (Name, Size, Date).
-- **`FileOperations`**: Logic for recursive copying, deleting, and identifying orphaned preferences.
+- **`FileFilter`**: Logic for filtering files based on hidden status and search queries.
+- **`FileOperations`**: Logic for recursive copying, deleting, and identifying orphaned preferences. Now uses **Kotlin Coroutines** for background execution.
 
 ### 2. Navigation & History
 - Navigation is session-based.
 - `FileListFragment` maintains a `pathHistory` stack (List of `File` objects).
 - The `onBackPressedCallback` pops from this stack to provide a standard "Back" experience.
+- The `..` item in the file list allows for manual upward navigation.
 
 ### 3. Storage Discovery
 - Direct listing of `/storage` is often restricted.
@@ -34,6 +36,10 @@ To maintain testability, core filesystem logic is isolated from the UI:
   - `settings`: Global toggles (Advanced Mode, Show Hidden, Confirm Delete, Global Sort Default).
   - `directory_sort_settings`: Per-directory sort overrides (Key = Absolute Path, Value = `SortType`).
 - **Orphan Cleanup**: `FileListFragment` calls `cleanupSortPrefs()` on every load to remove saved preferences for directories that no longer exist.
+
+### 5. Media & Async Tasks
+- **Thumbnails**: Media thumbnails are loaded asynchronously in `FileAdapter` using an `ExecutorService` and `ContentResolver.loadThumbnail`.
+- **Heavy Operations**: Copying and deleting tasks use `lifecycleScope` in the Fragment and `withContext(Dispatchers.IO)` in `FileOperations`.
 
 ## Licensing & Compliance
 

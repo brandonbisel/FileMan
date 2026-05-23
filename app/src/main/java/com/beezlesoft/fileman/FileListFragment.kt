@@ -52,7 +52,8 @@ import kotlinx.coroutines.launch
 
 /**
  * The primary fragment responsible for displaying the file list and handling user interactions.
- * It manages directory navigation, file operations (copy, move, rename, delete), and settings.
+ * It manages directory navigation, file operations (copy, move, rename, delete), search, 
+ * multi-selection, and favorites.
  */
 class FileListFragment : Fragment() {
 
@@ -251,7 +252,8 @@ class FileListFragment : Fragment() {
     }
 
     /**
-     * Initializes the RecyclerView with the [FileAdapter] and handles clicks.
+     * Initializes the RecyclerView with the [FileAdapter] and handles clicks, multi-selection, 
+     * and Action Mode management.
      */
     private fun setupRecyclerView() {
         adapter = FileAdapter(
@@ -286,6 +288,9 @@ class FileListFragment : Fragment() {
         binding.recyclerView.adapter = adapter
     }
 
+    /**
+     * Callback for managing the Contextual Action Bar (CAB) during multi-selection mode.
+     */
     private val actionModeCallback = object : ActionMode.Callback {
         override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
             mode.menuInflater.inflate(R.menu.menu_file_selection, menu)
@@ -452,14 +457,17 @@ class FileListFragment : Fragment() {
         popup.show()
     }
 
+    /**
+     * Toggles the favorite status of a directory and updates persistence.
+     */
     private fun toggleFavorite(file: File) {
         val path = file.absolutePath
         if (favoritePrefs.contains(path)) {
             favoritePrefs.edit().remove(path).apply()
-            Toast.makeText(context, "Removed from favorites", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, getString(R.string.msg_favorite_removed), Toast.LENGTH_SHORT).show()
         } else {
             favoritePrefs.edit().putString(path, file.name).apply()
-            Toast.makeText(context, "Added to favorites", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, getString(R.string.msg_favorite_added), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -600,6 +608,9 @@ class FileListFragment : Fragment() {
             .show()
     }
 
+    /**
+     * Performs the actual deletion of a single file or directory.
+     */
     private fun performDelete(file: File) {
         val dialog = showProgressDialog(getString(R.string.menu_delete))
         lifecycleScope.launch {
@@ -616,6 +627,9 @@ class FileListFragment : Fragment() {
         }
     }
 
+    /**
+     * Shows a confirmation dialog before deleting multiple selected items.
+     */
     private fun showBulkDeleteConfirmation(files: List<File>) {
         if (!confirmDelete) {
             performBulkDelete(files)
@@ -632,6 +646,9 @@ class FileListFragment : Fragment() {
             .show()
     }
 
+    /**
+     * Performs the bulk deletion of multiple files or directories in the background.
+     */
     private fun performBulkDelete(files: List<File>) {
         val dialog = showProgressDialog(getString(R.string.menu_delete))
         lifecycleScope.launch {
@@ -645,6 +662,12 @@ class FileListFragment : Fragment() {
         }
     }
 
+    /**
+     * Displays a non-cancelable progress dialog with a generic message and indeterminate progress bar.
+     * 
+     * @param title The title/message to display in the dialog.
+     * @return The created [AlertDialog] instance.
+     */
     private fun showProgressDialog(title: String): AlertDialog {
         val view = layoutInflater.inflate(R.layout.layout_progress, null)
         val message = view.findViewById<android.widget.TextView>(R.id.progressMessage)
@@ -677,7 +700,8 @@ class FileListFragment : Fragment() {
     }
 
     /**
-     * Displays the settings dialog to toggle advanced browsing options and global defaults.
+     * Displays the settings dialog to toggle advanced browsing options, hidden files, 
+     * delete confirmations, and global defaults.
      */
     private fun showSettingsDialog() {
         val options = arrayOf(
@@ -750,14 +774,11 @@ class FileListFragment : Fragment() {
     }
 
     /**
-     * Filters the current file list based on the [currentQuery].
+     * Filters the current [allFiles] list based on [showHidden] and [currentQuery],
+     * then updates the adapter with the results.
      */
     private fun filterFiles() {
-        val filtered = if (currentQuery.isEmpty()) {
-            allFiles
-        } else {
-            allFiles.filter { it.name.contains(currentQuery, ignoreCase = true) }
-        }
+        val filtered = FileFilter.filterFiles(allFiles, showHidden, currentQuery)
 
         if (filtered.isEmpty()) {
             if (!currentPath.canRead()) {
@@ -808,7 +829,7 @@ class FileListFragment : Fragment() {
         }
         
         val finalFiles = files ?: emptyList()
-        allFiles = if (showHidden) finalFiles else finalFiles.filter { !it.name.startsWith(".") }
+        allFiles = finalFiles // Full list, filtering happens in filterFiles()
         
         filterFiles()
         (requireActivity() as AppCompatActivity).supportActionBar?.title = directory.absolutePath

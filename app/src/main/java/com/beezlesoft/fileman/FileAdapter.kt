@@ -16,6 +16,7 @@
 
 package com.beezlesoft.fileman
 
+import android.content.Context
 import android.net.Uri
 import android.text.format.Formatter
 import android.util.Size
@@ -27,6 +28,7 @@ import android.webkit.MimeTypeMap
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.AttrRes
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
 import java.text.SimpleDateFormat
@@ -36,10 +38,12 @@ import java.util.concurrent.Executors
 
 /**
  * Adapter for the RecyclerView to display file and directory entries.
+ * Supports multi-selection, media thumbnails, and special handling for parent navigation items.
  *
  * @property files The list of files to display.
  * @property onItemClick Callback invoked when a file or directory is clicked.
  * @property onItemLongClick Callback invoked when a file or directory is long-clicked (or right-clicked).
+ * @property onSelectionChanged Callback invoked when the number of selected items changes.
  */
 class FileAdapter(
     private var files: List<File>,
@@ -53,61 +57,47 @@ class FileAdapter(
     private var multiSelectMode = false
     private val executor = Executors.newFixedThreadPool(4)
 
-    /**
-     * ViewHolder class for file list items.
-     */
-    class FileViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val icon: ImageView = view.findViewById(R.id.fileIcon)
-        val name: TextView = view.findViewById(R.id.fileName)
-        val info: TextView = view.findViewById(R.id.fileInfo)
-        val container: View = view
-    }
+    class FileViewHolder(val binding: com.beezlesoft.fileman.databinding.ItemFileBinding) : 
+        RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FileViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_file, parent, false)
-        return FileViewHolder(view)
+        val themedContext = androidx.appcompat.view.ContextThemeWrapper(parent.context, R.style.Theme_FileMan)
+        val inflater = LayoutInflater.from(themedContext)
+        val binding = com.beezlesoft.fileman.databinding.ItemFileBinding.inflate(inflater, parent, false)
+        return FileViewHolder(binding)
     }
 
     override fun onBindViewHolder(holder: FileViewHolder, position: Int) {
         val file = files[position]
-        holder.name.text = if (file.name.isEmpty()) file.absolutePath else file.name
+        holder.binding.fileName.text = if (file.name.isEmpty()) file.absolutePath else file.name
         
         val context = holder.itemView.context
         val size = if (file.isDirectory) "" else Formatter.formatShortFileSize(context, file.length())
         val date = dateFormat.format(Date(file.lastModified()))
         
-        // Show selection state
-        holder.container.isActivated = selectedItems.contains(file)
+        holder.binding.root.isActivated = selectedItems.contains(file)
 
         if (file.name == "..") {
-            holder.name.text = ".."
-            holder.info.text = context.getString(R.string.file_info_parent_dir)
-            holder.icon.setImageResource(R.drawable.ic_folder)
-            holder.icon.setColorFilter(context.getColorFromAttr(com.google.android.material.R.attr.colorOutline))
+            holder.binding.fileName.text = ".."
+            holder.binding.fileInfo.text = context.getString(R.string.file_info_parent_dir)
+            holder.binding.fileIcon.setImageResource(R.drawable.ic_folder)
+            holder.binding.fileIcon.setColorFilter(0xFF43474E.toInt())
         } else {
-            // Use a template for the info text if size is available
-            holder.info.text = if (size.isEmpty()) {
-                date
-            } else {
-                context.getString(R.string.file_info_placeholder)
-                    .replace("Size", size)
-                    .replace("Date", date)
-            }
+            holder.binding.fileInfo.text = if (size.isEmpty()) date else "$size • $date"
 
             if (file.isDirectory) {
-                holder.icon.setImageResource(R.drawable.ic_folder)
-                holder.icon.setColorFilter(context.getColorFromAttr(com.google.android.material.R.attr.colorPrimary))
+                holder.binding.fileIcon.setImageResource(R.drawable.ic_folder)
+                holder.binding.fileIcon.setColorFilter(0xFF0061A4.toInt())
             } else {
                 val extension = file.extension.lowercase()
                 val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: ""
                 
                 if (mimeType.startsWith("image/") || mimeType.startsWith("video/")) {
-                    holder.icon.setImageResource(R.drawable.ic_file) // Placeholder
-                    holder.icon.setColorFilter(context.getColorFromAttr(com.google.android.material.R.attr.colorOutline))
+                    holder.binding.fileIcon.setImageResource(R.drawable.ic_file)
+                    holder.binding.fileIcon.setColorFilter(0xFF43474E.toInt())
                     
                     val tag = file.absolutePath
-                    holder.icon.tag = tag
+                    holder.binding.fileIcon.tag = tag
                     
                     executor.execute {
                         try {
@@ -116,20 +106,19 @@ class FileAdapter(
                                 Size(128, 128),
                                 null
                             )
-                            holder.itemView.post {
-                                if (holder.icon.tag == tag) {
-                                    holder.icon.setImageBitmap(thumbnail)
-                                    holder.icon.clearColorFilter()
+                            holder.binding.root.post {
+                                if (holder.binding.fileIcon.tag == tag) {
+                                    holder.binding.fileIcon.setImageBitmap(thumbnail)
+                                    holder.binding.fileIcon.clearColorFilter()
                                 }
                             }
                         } catch (e: Exception) {
-                            // Failed to load thumbnail, keep generic icon
                         }
                     }
                 } else {
-                    holder.icon.setImageResource(R.drawable.ic_file)
-                    holder.icon.setColorFilter(context.getColorFromAttr(com.google.android.material.R.attr.colorOutline))
-                    holder.icon.tag = null
+                    holder.binding.fileIcon.setImageResource(R.drawable.ic_file)
+                    holder.binding.fileIcon.setColorFilter(0xFF43474E.toInt())
+                    holder.binding.fileIcon.tag = null
                 }
             }
         }
@@ -156,6 +145,10 @@ class FileAdapter(
 
     override fun getItemCount(): Int = files.size
 
+    /**
+     * Enables or disables multi-selection mode.
+     * @param enabled True to enable, false to disable and clear selections.
+     */
     fun setMultiSelectMode(enabled: Boolean) {
         multiSelectMode = enabled
         if (!enabled) {
@@ -164,6 +157,10 @@ class FileAdapter(
         }
     }
 
+    /**
+     * Toggles the selection state of a specific file.
+     * @param file The file to toggle.
+     */
     fun toggleSelection(file: File) {
         if (selectedItems.contains(file)) {
             selectedItems.remove(file)
@@ -174,6 +171,9 @@ class FileAdapter(
         onSelectionChanged(selectedItems.size)
     }
 
+    /**
+     * Returns a list of currently selected files.
+     */
     fun getSelectedFiles(): List<File> = selectedItems.toList()
 
     /**
@@ -185,7 +185,7 @@ class FileAdapter(
         notifyDataSetChanged()
     }
 
-    private fun android.content.Context.getColorFromAttr(@AttrRes attrColor: Int): Int {
+    private fun Context.getColorFromAttr(@AttrRes attrColor: Int): Int {
         val typedValue = TypedValue()
         theme.resolveAttribute(attrColor, typedValue, true)
         return typedValue.data
