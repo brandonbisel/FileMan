@@ -84,6 +84,10 @@ The project follows a rigorous **Git Flow** pattern to ensure stability and trac
 ### 3. Release Cycle
 - **Cutoff**: When `dev` is ready for release, tag it as `rc-X.Y.Z` (Release Candidate) and create a `release/X.Y.Z` branch from it.
 - **Hardening**: Use the `release/` branch for final versioning, UI tweaks, and critical bug fixes.
+- **RC Grooming**: Fixes for bugs found during the RC phase must use "Grooming Branches":
+  - Naming: `groom/vX.Y.Z/short-description`.
+  - **Strategy**: These branches **MUST be squash-merged** into the `release/` branch.
+  - **Reasoning**: This ensures every fix adds exactly one commit to the release history, allowing CI to accurately number release candidates (RC1, RC2, etc.).
 - **Completion**:
   1. Merge `release/` into `main`.
   2. Tag `main` with the final version `vX.Y.Z`.
