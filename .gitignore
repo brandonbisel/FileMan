@@ -9,3 +9,6 @@
 .cxx
 local.properties
 /tmp
+
+# Local machine-specific AI tool context
+.ai-local-tools.md
