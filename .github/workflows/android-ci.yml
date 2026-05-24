@@ -37,7 +37,7 @@ jobs:
         fi
 
     - name: Enable Gradle Configuration Cache
-      run: $ ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
+      run: ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Build with Gradle
       run: ./gradlew assembleDebug ${{ env.WARNING_MODE }}
@@ -111,7 +111,7 @@ jobs:
         fi
 
     - name: Enable Gradle Configuration Cache
-      run: $ ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
+      run: ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Run Unit Tests
       run: ./gradlew testDebugUnitTest ${{ env.WARNING_MODE }}
@@ -169,7 +169,7 @@ jobs:
         fi
 
     - name: Enable Gradle Configuration Cache
-      run: $ ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
+      run: ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Run Static Analysis (Detekt)
       run: ./gradlew detekt ${{ env.WARNING_MODE }}
@@ -227,7 +227,7 @@ jobs:
         fi
 
     - name: Enable Gradle Configuration Cache
-      run: $ ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
+      run: ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Run Dependency Vulnerability Scan
       run: ./gradlew dependencyCheckAnalyze ${{ env.WARNING_MODE }}
