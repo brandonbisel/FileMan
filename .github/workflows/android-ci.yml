@@ -23,7 +23,11 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -36,11 +40,8 @@ jobs:
           echo "WARNING_MODE=--warning-mode none" >> $GITHUB_ENV
         fi
 
-    - name: Enable Gradle Configuration Cache
-      run: ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
-
     - name: Build with Gradle
-      run: ./gradlew assembleDebug ${{ env.WARNING_MODE }}
+      run: ./gradlew assembleDebug --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Rename and Upload APK Artifact
       run: |
@@ -97,7 +98,11 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -110,11 +115,8 @@ jobs:
           echo "WARNING_MODE=--warning-mode none" >> $GITHUB_ENV
         fi
 
-    - name: Enable Gradle Configuration Cache
-      run: ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
-
     - name: Run Unit Tests
-      run: ./gradlew testDebugUnitTest ${{ env.WARNING_MODE }}
+      run: ./gradlew testDebugUnitTest --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Upload Unit Test Results
       if: always()
@@ -126,7 +128,7 @@ jobs:
           app/build/reports/tests/testDebugUnitTest/
 
     - name: Generate Coverage Report
-      run: ./gradlew koverXmlReportDebug ${{ env.WARNING_MODE }}
+      run: ./gradlew koverXmlReportDebug --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Upload Coverage Report
       if: always()
@@ -155,7 +157,11 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -168,11 +174,8 @@ jobs:
           echo "WARNING_MODE=--warning-mode none" >> $GITHUB_ENV
         fi
 
-    - name: Enable Gradle Configuration Cache
-      run: ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
-
     - name: Run Static Analysis (Detekt)
-      run: ./gradlew detekt ${{ env.WARNING_MODE }}
+      run: ./gradlew detekt --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Upload Detekt Report
       if: always()
@@ -182,7 +185,7 @@ jobs:
         path: app/build/reports/detekt/
 
     - name: Run Lint
-      run: ./gradlew lintDebug ${{ env.WARNING_MODE }}
+      run: ./gradlew lintDebug --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Upload Lint Report
       if: always()
@@ -213,7 +216,11 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -226,11 +233,8 @@ jobs:
           echo "WARNING_MODE=--warning-mode none" >> $GITHUB_ENV
         fi
 
-    - name: Enable Gradle Configuration Cache
-      run: ./gradlew --configuration-cache ${{ env.WARNING_MODE }}
-
     - name: Run Dependency Vulnerability Scan
-      run: ./gradlew dependencyCheckAnalyze ${{ env.WARNING_MODE }}
+      run: ./gradlew dependencyCheckAnalyze --configuration-cache ${{ env.WARNING_MODE }}
       env:
         NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
 
