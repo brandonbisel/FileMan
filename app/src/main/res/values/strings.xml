@@ -1,0 +1,76 @@
+<resources>
+    <string name="app_name">FileMan</string>
+    <string name="action_settings">Settings</string>
+
+    <!-- Main Menu -->
+    <string name="menu_search">Search</string>
+    <string name="menu_new_folder">New Folder</string>
+    <string name="menu_dashboard">Dashboard</string>
+    <string name="menu_paste">Paste</string>
+    <string name="menu_sort_by">Sort by</string>
+    <string name="menu_sort_name">Name</string>
+    <string name="menu_sort_size">Size</string>
+    <string name="menu_sort_date">Date</string>
+    <string name="menu_internal_storage">Main Storage</string>
+    <string name="menu_app_private">FileMan Internal Files</string>
+    <string name="menu_storage_devices">Storage Devices</string>
+    <string name="menu_system_files">System Files (/system)</string>
+    <string name="menu_system_root">System Root (/)</string>
+
+    <!-- Context Menu -->
+    <string name="menu_open">Open</string>
+    <string name="menu_share">Share</string>
+    <string name="menu_copy">Copy</string>
+    <string name="menu_move">Move</string>
+    <string name="menu_rename">Rename</string>
+    <string name="menu_delete">Delete</string>
+    <string name="menu_details">Details</string>
+    <string name="menu_favorite">Add to Favorites</string>
+    <string name="menu_unfavorite">Remove from Favorites</string>
+    <string name="dashboard_favorites">Favorites</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_confirm_delete_title">Confirm Delete</string>
+    <string name="dialog_confirm_delete_message">Are you sure you want to delete %s?</string>
+    <string name="dialog_file_details_title">File Details</string>
+    <string name="dialog_settings_title">Settings</string>
+    <string name="dialog_settings_advanced">Show Advanced/System Folders</string>
+    <string name="dialog_settings_hidden_files">Show Hidden Files</string>
+    <string name="dialog_settings_confirm_delete">Confirm on Delete</string>
+    <string name="dialog_settings_global_sort">Set Current Sort as Global Default</string>
+    <string name="dialog_settings_show_thumbnails">Show Media Thumbnails</string>
+    <string name="dialog_settings_global_thumbnails">Set Current Thumbnail View as Global Default</string>
+    <string name="dialog_close">Close</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_ok">OK</string>
+
+    <!-- Messages -->
+    <string name="msg_permissions_denied">Permissions denied</string>
+    <string name="msg_directory_empty">Directory is empty</string>
+    <string name="msg_permission_denied_folder">Permission denied: %s</string>
+    <string name="msg_file_exists">A file with that name already exists</string>
+    <string name="msg_renamed_success">Renamed successfully</string>
+    <string name="msg_rename_failed">Rename failed</string>
+    <string name="msg_folder_created_success">Folder created successfully</string>
+    <string name="msg_folder_create_failed">Failed to create folder</string>
+    <string name="msg_copied_success">Copied successfully</string>
+    <string name="msg_moved_success">Moved successfully</string>
+    <string name="msg_moved_success_fallback">Moved successfully (copied &amp; deleted)</string>
+    <string name="msg_operation_failed">Operation failed: %s</string>
+    <string name="msg_deleted_success">Deleted successfully</string>
+    <string name="msg_delete_failed">Failed to delete</string>
+    <string name="msg_open_failed">Could not open file: %s</string>
+    <string name="msg_share_failed">Could not share file: %s</string>
+    <string name="msg_cannot_share_folders">Cannot share folders</string>
+    <string name="msg_copy_toast">Copied: %s</string>
+    <string name="msg_move_toast">Moving: %s</string>
+    <string name="msg_favorite_added">Added to favorites</string>
+    <string name="msg_favorite_removed">Removed from favorites</string>
+    <string name="msg_global_sort_set">Global default set to %s</string>
+    <string name="msg_global_thumbnails_set">Global thumbnail default set to %b</string>
+    <string name="msg_processing">Processing&#8230;</string>
+
+    <!-- File Info Labels -->
+    <string name="file_info_placeholder">Size | Date</string>
+    <string name="file_info_parent_dir">Parent Directory</string>
+</resources>
