@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Using M3 attributes for selection highlight -->
+    <item android:state_activated="true">
+        <shape android:shape="rectangle">
+            <!-- Use a color resource that is guaranteed to exist -->
+            <solid android:color="@android:color/holo_blue_light" />
+        </shape>
+    </item>
+    <!-- Avoid ?android:attr/selectableItemBackground here as it seems to cause theme=null crashes in some contexts -->
+    <item android:drawable="@android:color/transparent" />
+</selector>

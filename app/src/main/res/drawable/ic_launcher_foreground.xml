@@ -1,0 +1,21 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Design centered at (54, 54) -->
+
+    <!-- Paper Sheet (The document) - Vibrant Blue -->
+    <!-- Placed first so it is in the background -->
+    <path
+        android:fillColor="#90CAF9"
+        android:pathData="M38,31 h32 c1,0 2,0.9 2,2 v25 h-36 v-25 c0,-1.1 1,-2 2,-2 z" />
+
+    <!-- Simplified Flattened Folder Silhouette - Pure White -->
+    <!-- Placed second so it overlaps the document -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,42 v29 c0,1.6 1.4,3 3,3 h46 c1.6,0 3,-1.4 3,-3 v-29 c0,-1.6 -1.4,-3 -3,-3 l-24,0 l-6,-5 l-16,0 c-1.6,0 -3,1.4 -3,3 z" />
+
+</vector>
