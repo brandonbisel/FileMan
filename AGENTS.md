@@ -104,3 +104,8 @@ The project follows a rigorous **Git Flow** pattern to ensure stability and trac
 - Progress bars for copy/move tasks.
 - Multi-selection mode for bulk actions.
 - Search functionality.
+
+## Local Build-Environment Context
+AI agents must assume a standardized build environment based strictly on the configurations committed to this repository. However, developers may optionally provide a `.ai-local-tools.md` file in the project root to communicate machine-specific auxiliary tooling (e.g., active Docker containers, local Model Context Protocol (MCP) servers, or specific hardware emulators). 
+
+**Strict Scope Limit:** If an `.ai-local-tools.md` file is present, agents may read it *only* to discover auxiliary local tools to assist their workflow. Agents **MUST NOT** rely on this file for project dependencies, hidden build flags, or logic that would break reproducibility on other machines or in the CI pipeline.
