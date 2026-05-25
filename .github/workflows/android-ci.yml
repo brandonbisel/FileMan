@@ -32,7 +32,7 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Determine Gradle Warning Mode
+    - name: Determine Gradle Warning Mode and Build Variant
       run: |
         if [[ "${{ github.ref_name }}" == release/* ]]; then
           echo "WARNING_MODE=--warning-mode all" >> $GITHUB_ENV
@@ -40,13 +40,22 @@ jobs:
           echo "WARNING_MODE=--warning-mode none" >> $GITHUB_ENV
         fi
 
+        if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == release/* ]]; then
+          echo "BUILD_VARIANT=Release" >> $GITHUB_ENV
+          echo "LOWER_VARIANT=release" >> $GITHUB_ENV
+        else
+          echo "BUILD_VARIANT=Debug" >> $GITHUB_ENV
+          echo "LOWER_VARIANT=debug" >> $GITHUB_ENV
+        fi
+
     - name: Build with Gradle
-      run: ./gradlew assembleDebug --configuration-cache ${{ env.WARNING_MODE }}
+      run: ./gradlew assemble${{ env.BUILD_VARIANT }} --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Rename and Upload APK Artifact
       run: |
         BRANCH_NAME="${{ github.ref_name }}"
         RUN_NUM="${{ github.run_number }}"
+        VARIANT="${{ env.LOWER_VARIANT }}"
 
         if [[ $BRANCH_NAME == release/* ]]; then
           VERSION="${BRANCH_NAME#release/}"
@@ -70,13 +79,13 @@ jobs:
         echo "APK_FILENAME=$FILENAME" >> $GITHUB_ENV
         echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
 
-        cp app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/debug/$FILENAME"
+        cp "app/build/outputs/apk/$VARIANT/app-$VARIANT.apk" "app/build/outputs/apk/$VARIANT/$FILENAME"
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v7
       with:
         name: ${{ env.ARTIFACT_NAME }}
-        path: app/build/outputs/apk/debug/${{ env.APK_FILENAME }}
+        path: app/build/outputs/apk/${{ env.LOWER_VARIANT }}/${{ env.APK_FILENAME }}
 
     - name: Upload Problems Report
       if: always()
@@ -107,12 +116,20 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Determine Gradle Warning Mode
+    - name: Determine Gradle Warning Mode and Build Variant
       run: |
         if [[ "${{ github.ref_name }}" == release/* ]]; then
           echo "WARNING_MODE=--warning-mode all" >> $GITHUB_ENV
         else
           echo "WARNING_MODE=--warning-mode none" >> $GITHUB_ENV
+        fi
+
+        if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == release/* ]]; then
+          echo "BUILD_VARIANT=Release" >> $GITHUB_ENV
+          echo "LOWER_VARIANT=release" >> $GITHUB_ENV
+        else
+          echo "BUILD_VARIANT=Debug" >> $GITHUB_ENV
+          echo "LOWER_VARIANT=debug" >> $GITHUB_ENV
         fi
 
     - name: Run Unit Tests
@@ -166,12 +183,20 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Determine Gradle Warning Mode
+    - name: Determine Gradle Warning Mode and Build Variant
       run: |
         if [[ "${{ github.ref_name }}" == release/* ]]; then
           echo "WARNING_MODE=--warning-mode all" >> $GITHUB_ENV
         else
           echo "WARNING_MODE=--warning-mode none" >> $GITHUB_ENV
+        fi
+
+        if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == release/* ]]; then
+          echo "BUILD_VARIANT=Release" >> $GITHUB_ENV
+          echo "LOWER_VARIANT=release" >> $GITHUB_ENV
+        else
+          echo "BUILD_VARIANT=Debug" >> $GITHUB_ENV
+          echo "LOWER_VARIANT=debug" >> $GITHUB_ENV
         fi
 
     - name: Run Static Analysis (Detekt)
@@ -185,7 +210,7 @@ jobs:
         path: app/build/reports/detekt/
 
     - name: Run Lint
-      run: ./gradlew lintDebug --configuration-cache ${{ env.WARNING_MODE }}
+      run: ./gradlew lint${{ env.BUILD_VARIANT }} --configuration-cache ${{ env.WARNING_MODE }}
 
     - name: Upload Lint Report
       if: always()
@@ -193,8 +218,8 @@ jobs:
       with:
         name: lint-report-${{ github.run_number }}
         path: |
-          app/build/reports/lint-results-debug.html
-          app/build/reports/lint-results-debug.xml
+          app/build/reports/lint-results-${{ env.LOWER_VARIANT }}.html
+          app/build/reports/lint-results-${{ env.LOWER_VARIANT }}.xml
 
     - name: Upload Problems Report
       if: always()
