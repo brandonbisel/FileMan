@@ -18,10 +18,10 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: set up JDK 17
+    - name: set up JDK 21
       uses: actions/setup-java@v5
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
 
     - name: Setup Gradle
@@ -93,10 +93,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: set up JDK 17
+    - name: set up JDK 21
       uses: actions/setup-java@v5
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
 
     - name: Setup Gradle
@@ -152,10 +152,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: set up JDK 17
+    - name: set up JDK 21
       uses: actions/setup-java@v5
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
 
     - name: Setup Gradle
@@ -211,10 +211,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: set up JDK 17
+    - name: set up JDK 21
       uses: actions/setup-java@v5
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
 
     - name: Setup Gradle
@@ -222,33 +222,22 @@ jobs:
       with:
         cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-
-    - name: Determine Gradle Warning Mode
-      run: |
-        if [[ "${{ github.ref_name }}" == release/* ]]; then
-          echo "WARNING_MODE=--warning-mode all" >> $GITHUB_ENV
-        else
-          echo "WARNING_MODE=--warning-mode none" >> $GITHUB_ENV
-        fi
-
     - name: Run Dependency Vulnerability Scan
-      run: ./gradlew dependencyCheckAnalyze --configuration-cache ${{ env.WARNING_MODE }}
+      uses: dependency-check/Dependency-Check_Action@main
       env:
-        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        JAVA_HOME: /opt/jdk
+      id: Depcheck
+      with:
+        project: 'FileMan'
+        path: '.'
+        format: 'HTML'
+        out: 'reports'
+        args: >
+          --failOnCVSS 7
+          --enableRetired
 
     - name: Upload Dependency Check Report
-      if: always()
       uses: actions/upload-artifact@v7
       with:
         name: dependency-check-report-${{ github.run_number }}
-        path: app/build/reports/dependency-check-report.html
-
-    - name: Upload Problems Report
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: Gradle Problems Report ${{ github.run_number }}
-        path: app/build/reports/problems/
-        if-no-files-found: ignore
+        path: ${{github.workspace}}/reports
