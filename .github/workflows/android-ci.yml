@@ -248,7 +248,7 @@ jobs:
         cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
     - name: Cache NVD Database
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: app/odc-data
         key: ${{ runner.os }}-odc-data
