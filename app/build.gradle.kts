@@ -52,6 +52,9 @@ kover {
 }
 
 dependencyCheck {
+    data {
+        directory = "${project.projectDir}/odc-data"
+    }
     nvd {
         apiKey = project.findProperty("nvdApiKey")?.toString() ?: System.getenv("NVD_API_KEY")
     }

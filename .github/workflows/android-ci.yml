@@ -247,22 +247,22 @@ jobs:
       with:
         cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-    - name: Run Dependency Vulnerability Scan
-      uses: dependency-check/Dependency-Check_Action@main
-      env:
-        JAVA_HOME: /opt/jdk
-      id: Depcheck
+    - name: Cache NVD Database
+      uses: actions/cache@v4
       with:
-        project: 'FileMan'
-        path: '.'
-        format: 'HTML'
-        out: 'reports'
-        args: >
-          --failOnCVSS 7
-          --enableRetired
+        path: app/odc-data
+        key: ${{ runner.os }}-odc-data
+        restore-keys: |
+          ${{ runner.os }}-odc-data
+
+    - name: Run Dependency Check
+      run: ./gradlew :app:dependencyCheckAnalyze --configuration-cache
+      env:
+        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
 
     - name: Upload Dependency Check Report
+      if: always()
       uses: actions/upload-artifact@v7
       with:
         name: dependency-check-report-${{ github.run_number }}
-        path: ${{github.workspace}}/reports
+        path: app/build/reports/dependency-check-report.html
